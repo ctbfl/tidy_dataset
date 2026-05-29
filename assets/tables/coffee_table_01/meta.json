@@ -1,0 +1,22 @@
+{
+  "name": "coffee_table_01",
+  "category": "CoffeeTable",
+  "source_hash": "90a157c1a98305296061b394380b4b5a",
+  "source_dataset": "sgbot/sgbot_dataset/models/support_table",
+  "scale": 1.0,
+  "tabletop": {
+    "top_z": 0.17161,
+    "x_range": [
+      -0.45,
+      0.45
+    ],
+    "y_range": [
+      -0.29746,
+      0.29746
+    ],
+    "width": 0.9,
+    "depth": 0.59492,
+    "area_m2": 0.53542
+  },
+  "tabletop_source": "provided"
+}

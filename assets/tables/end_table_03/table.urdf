@@ -1,0 +1,30 @@
+<?xml version="1.0" ?>
+<robot name="end_table_03">
+  <link name="baseLink">
+    <contact>
+      <lateral_friction value="1.0"/>
+      <inertia_scaling value="3.0"/>
+    </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="-0.000 0.000 -0.322"/>
+       <mass value=".1"/>
+       <inertia ixx="1" ixy="0.0" ixz="0.0" iyy="1" iyz="0.0" izz="1"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="visual.obj" scale="1.000 1.000 1.000"/>
+      </geometry>
+      <material name="texture_material">
+            <texture filename="texture.png"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="visual.obj" scale="1.000 1.000 1.000"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>
+        

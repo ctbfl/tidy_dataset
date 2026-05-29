@@ -1,0 +1,22 @@
+{
+  "name": "end_table_02",
+  "category": "EndTable",
+  "source_hash": "466ed029d1acae054199ce3660e593e",
+  "source_dataset": "sgbot/sgbot_dataset/models/support_table",
+  "scale": 1.0,
+  "tabletop": {
+    "top_z": 0.23999,
+    "x_range": [
+      -0.37238,
+      0.37238
+    ],
+    "y_range": [
+      -0.37238,
+      0.37238
+    ],
+    "width": 0.74477,
+    "depth": 0.74476,
+    "area_m2": 0.55467
+  },
+  "tabletop_source": "provided"
+}

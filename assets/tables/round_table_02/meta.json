@@ -1,0 +1,22 @@
+{
+  "name": "round_table_02",
+  "category": "RoundTable",
+  "source_hash": "dccb87aacbcb40a4f1783a44a88d6274",
+  "source_dataset": "sgbot/sgbot_dataset/models/support_table",
+  "scale": 1.0,
+  "tabletop": {
+    "top_z": 0.50018,
+    "x_range": [
+      -0.34457,
+      0.34086
+    ],
+    "y_range": [
+      -0.34373,
+      0.34166
+    ],
+    "width": 0.68542,
+    "depth": 0.68539,
+    "area_m2": 0.46978
+  },
+  "tabletop_source": "computed"
+}

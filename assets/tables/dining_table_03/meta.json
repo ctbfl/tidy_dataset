@@ -1,0 +1,22 @@
+{
+  "name": "dining_table_03",
+  "category": "DiningTable",
+  "source_hash": "bf886e6f28740776f1783a44a88d6274",
+  "source_dataset": "sgbot/sgbot_dataset/models/support_table",
+  "scale": 1.0,
+  "tabletop": {
+    "top_z": 0.19833,
+    "x_range": [
+      -0.49683,
+      0.50317
+    ],
+    "y_range": [
+      -0.23604,
+      0.22238
+    ],
+    "width": 1.0,
+    "depth": 0.45842,
+    "area_m2": 0.45842
+  },
+  "tabletop_source": "provided"
+}
