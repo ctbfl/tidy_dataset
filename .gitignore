@@ -1,0 +1,11 @@
+data/*
+tmp/*
+__pycache__/
+*.pyc
+
+# Texture curation scratch (thumbnails, montages, CLIP embeddings, preview renders)
+assets/_texture_curate/
+
+# Heavy PBR maps are not versioned; meta.json (tile_m + CC0 source) is kept so the
+# library is reproducible. Re-download maps from the source recorded in each meta.json.
+assets/textures/**/*.jpg
