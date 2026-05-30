@@ -78,9 +78,8 @@ def assets(search: str = "", tag: str = "", source: str = ""):
 
 @app.get("/preview")
 def preview(asset_id: str):
-    with GPU:
-        path = previews.render(asset_id)
-    return Response(path.read_bytes(), media_type="image/png")
+    # Pure read from the shared cache (no GPU work); asset browser is the renderer.
+    return Response(previews.image_bytes(asset_id), media_type="image/png")
 
 
 @app.websocket("/ws")
