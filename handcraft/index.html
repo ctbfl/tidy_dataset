@@ -12,9 +12,23 @@
   #scene { margin: auto; max-width: 100%; max-height: 100vh; cursor: crosshair; }
   #hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: #8b94a3;
           background: rgba(20,22,28,0.7); padding: 5px 9px; border-radius: 4px; }
-  #save { position: absolute; right: 12px; bottom: 10px; background: #2f6b4e; color: #fff; border: none;
-          padding: 9px 16px; border-radius: 5px; cursor: pointer; font: inherit; }
-  #save:hover { background: #3a8762; }
+  #actions { position: absolute; right: 12px; bottom: 10px; display: flex; gap: 8px; }
+  #actions button { color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font: inherit; }
+  #save { background: #2f6b4e; } #save:hover { background: #3a8762; }
+  #load { background: #2f4f6b; } #load:hover { background: #3a6587; }
+
+  /* load dialog */
+  #loadModal { position: absolute; inset: 0; background: rgba(8,9,12,0.6); display: none;
+               align-items: center; justify-content: center; z-index: 10; }
+  #loadModal.open { display: flex; }
+  #loadCard { width: 380px; max-height: 70vh; background: #1b1d22; border-radius: 8px; padding: 14px;
+              display: flex; flex-direction: column; gap: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+  #loadCard h3 { margin: 0; font-size: 14px; }
+  #loadDir { font-size: 11px; color: #8b94a3; word-break: break-all; }
+  #loadList { list-style: none; margin: 0; padding: 0; overflow: auto; }
+  #loadList li { padding: 8px 10px; border-radius: 4px; cursor: pointer; }
+  #loadList li:hover { background: #2b303b; }
+  #loadClose { align-self: flex-end; background: #3a3f4b; }
 
   /* floating, foldable object list */
   #objects { position: absolute; left: 12px; top: 12px; width: 230px; background: rgba(29,31,37,0.94);
@@ -44,7 +58,18 @@
     <canvas id="scene" width="1024" height="768"></canvas>
     <div id="objects"><h3 id="objects-head">Objects (0)</h3><ul id="objects-list"></ul></div>
     <div id="hint">drag an asset onto the table &middot; click to select &middot; WASD move &middot; Q/E yaw</div>
-    <button id="save">Save scene</button>
+    <div id="actions">
+      <button id="load">Load scene</button>
+      <button id="save">Save scene</button>
+    </div>
+    <div id="loadModal">
+      <div id="loadCard">
+        <h3>Load scene</h3>
+        <div id="loadDir"></div>
+        <ul id="loadList"></ul>
+        <button id="loadClose">Close</button>
+      </div>
+    </div>
   </div>
 
   <div id="browser">
@@ -74,11 +99,32 @@ let selected = null;
 ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
   if (msg.type === 'saved') { flashHint('saved → ' + msg.name); return; }
+  if (msg.type === 'loaded') { flashHint('loaded → ' + msg.name); return; }
   img.src = 'data:image/jpeg;base64,' + msg.image;
   selected = msg.state.selected;
   renderObjects(msg.state.objects);
 };
 document.getElementById('save').addEventListener('click', () => send({ type: 'save' }));
+
+// load dialog: browse scene files on the server host and load one
+const loadModal = document.getElementById('loadModal');
+async function openLoad() {
+  const data = await (await fetch('/scenes')).json();
+  document.getElementById('loadDir').textContent = data.dir;
+  const ul = document.getElementById('loadList');
+  ul.innerHTML = '';
+  if (!data.scenes.length) ul.innerHTML = '<li style="color:#8b94a3;cursor:default">(no saved scenes)</li>';
+  for (const name of data.scenes) {
+    const li = document.createElement('li');
+    li.textContent = name;
+    li.addEventListener('click', () => { send({ type: 'load', name }); loadModal.classList.remove('open'); });
+    ul.appendChild(li);
+  }
+  loadModal.classList.add('open');
+}
+document.getElementById('load').addEventListener('click', openLoad);
+document.getElementById('loadClose').addEventListener('click', () => loadModal.classList.remove('open'));
+loadModal.addEventListener('click', (ev) => { if (ev.target === loadModal) loadModal.classList.remove('open'); });
 
 // pixel mapping from a mouse event to image coordinates
 function toImage(ev) {

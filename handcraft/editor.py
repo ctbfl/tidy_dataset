@@ -70,6 +70,21 @@ class SceneEditor:
                       for o in self.objects.values()],
         }
 
+    def clear(self) -> None:
+        for o in list(self.objects.values()):
+            self.scene.remove_entity(o.entity)
+        self.objects.clear()
+        self.selected = None
+
+    def load_scene_dict(self, data: dict) -> None:
+        """Replace the current objects with those described by a saved scene dict."""
+        self.clear()
+        for i, item in enumerate(data.get("items", [])):
+            obj = spawn(self.scene, LIBRARY[item["asset_id"]], f"{item['asset_id']}#{i}")
+            self.objects[obj.id] = obj
+            obj.set_pose(sapien.Pose(np.asarray(item["transform"], dtype=float)))
+        self.scene.update_render()
+
     # -- editing ---------------------------------------------------------- #
     def place(self, asset_id: str, x: int, y: int) -> str | None:
         point = self._world_point(x, y)

@@ -48,6 +48,19 @@ def _save_scene() -> str:
     return path.name
 
 
+def _list_scenes() -> list[str]:
+    return sorted(p.name for p in SAVE_DIR.glob("*.json"))
+
+
+def _load_scene(name: str) -> None:
+    # Resolve strictly inside SAVE_DIR (the file dialog lives on the server host).
+    path = (SAVE_DIR / name).resolve()
+    if path.parent != SAVE_DIR.resolve() or not path.is_file():
+        raise FileNotFoundError(name)
+    with GPU:
+        editor.load_scene_dict(json.loads(path.read_text()))
+
+
 app = FastAPI(title="tidy handcraft")
 
 
@@ -59,6 +72,11 @@ def index():
 @app.get("/meta")
 def meta():
     return {"sources": SOURCES, "tags": TAGS}
+
+
+@app.get("/scenes")
+def scenes():
+    return {"dir": str(SAVE_DIR), "scenes": _list_scenes()}
 
 
 @app.get("/assets")
@@ -78,8 +96,11 @@ def assets(search: str = "", tag: str = "", source: str = ""):
 
 @app.get("/preview")
 def preview(asset_id: str):
-    # Pure read from the shared cache (no GPU work); asset browser is the renderer.
-    return Response(previews.image_bytes(asset_id), media_type="image/png")
+    # Read from the shared cache; on a miss, SAPIEN-render it (serialized with the
+    # editor render via GPU lock) and write it back into the cache.
+    with GPU:
+        body = previews.image_bytes(asset_id)
+    return Response(body, media_type="image/png")
 
 
 @app.websocket("/ws")
@@ -102,6 +123,9 @@ async def ws(socket: WebSocket):
                 editor.key(msg["name"])
             elif kind == "save":
                 await socket.send_json({"type": "saved", "name": _save_scene()})
+            elif kind == "load":
+                _load_scene(msg["name"])
+                await socket.send_json({"type": "loaded", "name": msg["name"]})
             await socket.send_json(_frame())
     except WebSocketDisconnect:
         return
