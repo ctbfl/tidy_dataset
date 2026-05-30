@@ -16,6 +16,7 @@
   #actions button { color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font: inherit; }
   #save { background: #2f6b4e; } #save:hover { background: #3a8762; }
   #load { background: #2f4f6b; } #load:hover { background: #3a6587; }
+  #clear { background: #6b3a2f; } #clear:hover { background: #87493a; }
 
   /* load dialog */
   #loadModal { position: absolute; inset: 0; background: rgba(8,9,12,0.6); display: none;
@@ -59,6 +60,7 @@
     <div id="objects"><h3 id="objects-head">Objects (0)</h3><ul id="objects-list"></ul></div>
     <div id="hint">drag an asset onto the table &middot; click to select &middot; WASD move &middot; Q/E yaw</div>
     <div id="actions">
+      <button id="clear">Clear</button>
       <button id="load">Load scene</button>
       <button id="save">Save scene</button>
     </div>
@@ -119,7 +121,14 @@ ws.onmessage = (ev) => {
   renderObjects(msg.state.objects);
   if (msg.state.background) reflectBg(msg.state.background);
 };
-document.getElementById('save').addEventListener('click', () => send({ type: 'save' }));
+document.getElementById('save').addEventListener('click', () => {
+  const name = prompt('Save scene as (blank = auto-numbered):', '');
+  if (name === null) return;  // cancelled
+  send({ type: 'save', name: name.trim() });
+});
+document.getElementById('clear').addEventListener('click', () => {
+  if (confirm('Clear all objects from the scene?')) send({ type: 'clear' });
+});
 
 // load dialog: browse scene files on the server host and load one
 const loadModal = document.getElementById('loadModal');

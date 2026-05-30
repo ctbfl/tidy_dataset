@@ -42,9 +42,17 @@ def _frame() -> dict:
     return {"type": "frame", "image": base64.b64encode(buf.getvalue()).decode(), "state": editor.state()}
 
 
-def _save_scene() -> str:
-    n = max((int(p.stem) for p in SAVE_DIR.glob("*.json") if p.stem.isdigit()), default=0) + 1
-    path = SAVE_DIR / f"{n:04d}.json"
+def _save_scene(name: str | None = None) -> str:
+    if name:
+        stem = Path(name.strip()).stem  # strip any dir/extension; keep just the base name
+        if not stem:
+            raise ValueError("empty scene name")
+        path = (SAVE_DIR / f"{stem}.json").resolve()
+        if path.parent != SAVE_DIR.resolve():  # no path traversal
+            raise ValueError(f"invalid scene name: {name}")
+    else:
+        n = max((int(p.stem) for p in SAVE_DIR.glob("*.json") if p.stem.isdigit()), default=0) + 1
+        path = SAVE_DIR / f"{n:04d}.json"
     path.write_text(json.dumps(editor.scene_dict(), indent=2))
     return path.name
 
@@ -128,8 +136,10 @@ async def ws(socket: WebSocket):
                 editor.delete(msg["scene_id"])
             elif kind == "key":
                 editor.key(msg["name"])
+            elif kind == "clear":
+                editor.clear()
             elif kind == "save":
-                await socket.send_json({"type": "saved", "name": _save_scene()})
+                await socket.send_json({"type": "saved", "name": _save_scene(msg.get("name"))})
             elif kind == "randomize_bg":
                 with GPU:
                     editor.randomize_background()
