@@ -21,6 +21,7 @@ from PIL import Image
 from editor import SceneEditor
 from preview import PreviewRenderer
 from scene import LIBRARY
+from robotwin_utils import curated_textures
 
 HERE = Path(__file__).resolve().parent
 SAVE_DIR = HERE.parent / "data" / "tidy_scene_v0"
@@ -79,6 +80,12 @@ def scenes():
     return {"dir": str(SAVE_DIR), "scenes": _list_scenes()}
 
 
+@app.get("/textures")
+def textures():
+    return {"table": [t["id"] for t in curated_textures("table")],
+            "wall": [t["id"] for t in curated_textures("wall")]}
+
+
 @app.get("/assets")
 def assets(search: str = "", tag: str = "", source: str = ""):
     search = search.lower()
@@ -123,6 +130,13 @@ async def ws(socket: WebSocket):
                 editor.key(msg["name"])
             elif kind == "save":
                 await socket.send_json({"type": "saved", "name": _save_scene()})
+            elif kind == "randomize_bg":
+                with GPU:
+                    editor.randomize_background()
+            elif kind == "set_bg":
+                with GPU:
+                    editor.set_background(msg.get("table_texture") or None,
+                                          msg.get("wall_texture") or None)
             elif kind == "load":
                 _load_scene(msg["name"])
                 await socket.send_json({"type": "loaded", "name": msg["name"]})

@@ -61,11 +61,22 @@ class SceneEditor:
 
     # -- state for the client -------------------------------------------- #
     def state(self) -> dict:
-        return {"objects": list(self.objects), "selected": self.selected}
+        return {"objects": list(self.objects), "selected": self.selected,
+                "background": self.background_state()}
+
+    def background_state(self) -> dict:
+        ts = self.scene_wrap
+        return {"table": ts.table,
+                "table_texture": getattr(ts, "table_texture_id", None),
+                "wall_texture": getattr(ts, "wall_texture_id", None)}
 
     def scene_dict(self) -> dict:
+        ts = self.scene_wrap
         return {
-            "table": self.scene_wrap.table,
+            "version": 1,
+            "table": ts.table,
+            "table_texture": getattr(ts, "table_texture_id", None),
+            "wall_texture": getattr(ts, "wall_texture_id", None),
             "items": [{"asset_id": o.asset.id, "transform": o.get_pose().to_transformation_matrix().tolist()}
                       for o in self.objects.values()],
         }
@@ -76,9 +87,40 @@ class SceneEditor:
         self.objects.clear()
         self.selected = None
 
+    # -- background (table dims + textures) ------------------------------- #
+    def rebuild_background(self, table=None, table_texture_id=None, wall_texture_id=None,
+                           random_background=False) -> None:
+        """Rebuild table + wall in place (the session keeps one scene/renderer).
+        random_background=True ignores the manual texture ids."""
+        ts = self.scene_wrap
+        dims = table or ts.table
+        ts.random_background = random_background
+        ts.robotwin_create_table_and_wall(
+            table_length=dims["length"], table_width=dims["width"],
+            table_height=dims["height"], table_thickness=dims["thickness"],
+            table_texture_id=table_texture_id, wall_texture_id=wall_texture_id,
+        )
+        ts.table = dict(dims)
+        self.scene.update_render()
+
+    def randomize_background(self) -> None:
+        self.rebuild_background(random_background=True)
+
+    def set_background(self, table_texture_id=None, wall_texture_id=None) -> None:
+        self.rebuild_background(table_texture_id=table_texture_id,
+                                wall_texture_id=wall_texture_id, random_background=False)
+
     def load_scene_dict(self, data: dict) -> None:
-        """Replace the current objects with those described by a saved scene dict."""
+        """Replace the scene with a saved v1 dict (table dims + textures + items)."""
+        if data.get("version") != 1:
+            raise ValueError(f"unsupported scene version: {data.get('version')!r} (expected 1)")
         self.clear()
+        self.rebuild_background(
+            table=data.get("table"),
+            table_texture_id=data.get("table_texture"),
+            wall_texture_id=data.get("wall_texture"),
+            random_background=False,
+        )
         for i, item in enumerate(data.get("items", [])):
             obj = spawn(self.scene, LIBRARY[item["asset_id"]], f"{item['asset_id']}#{i}")
             self.objects[obj.id] = obj

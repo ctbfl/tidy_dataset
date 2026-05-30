@@ -22,6 +22,11 @@ def curated_textures(kind: str) -> list[dict]:
     return sets
 
 
+def curated_texture(kind: str, tex_id: str) -> dict | None:
+    """One curated texture set looked up by id (its <id> folder name), or None."""
+    return next((t for t in curated_textures(kind) if t["id"] == tex_id), None)
+
+
 def _tiled_texture(path: Path, repeat, srgb):
     """RenderTexture2D of `path` repeated (rx, ry) times. Seamless CC0 source, so
     plain tiling joins cleanly. SAPIEN box UVs are fixed 0..1, so we bake the tiling."""

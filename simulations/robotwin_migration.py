@@ -3,7 +3,7 @@ from pathlib import Path
 import sapien.core as sapien
 from sapien.utils.viewer import Viewer
 import numpy as np
-from robotwin_utils import create_box, create_table, curated_textures
+from robotwin_utils import create_box, create_table, curated_textures, curated_texture
 
 
 def _tile_repeat(surface_wh, tile_m):
@@ -103,20 +103,29 @@ class TidyScene:
             self.viewer.set_camera_xyz(x=0.0, y=-0.85, z=1.6)
             self.viewer.set_camera_rpy(r=0.0, p=-0.7912, y=-1.5708)
     
-    def robotwin_create_table_and_wall(self, 
-        table_xy_bias=[0, 0], 
+    def robotwin_create_table_and_wall(self,
+        table_xy_bias=[0, 0],
         table_length=1.2,
         table_width=0.74,
         table_height=0.74,
         table_thickness=0.05,
         no_wall=False,
-        no_table=False
+        no_table=False,
+        table_texture_id=None,
+        wall_texture_id=None,
         ):
         self.table_xy_bias = table_xy_bias
         table_height += self.table_z_bias
 
+        # Drop any previously built table/wall so this can be called again to rebuild.
+        for attr in ("table_entity", "wall_entity"):
+            ent = getattr(self, attr, None)
+            if ent is not None:
+                self.scene.remove_entity(ent)
+                setattr(self, attr, None)
+
         if self.random_background:
-            # Sample one PBR texture set each from our curated wall/table libraries.
+            # Random background takes priority over any manual texture ids.
             walls = curated_textures("wall")
             tables = curated_textures("table")
             self.wall_texture = walls[np.random.randint(len(walls))] if walls else None
@@ -133,15 +142,21 @@ class TidyScene:
             if np.random.rand() <= self.clean_background_rate:
                 self.table_texture = None
         else:
-            self.wall_texture, self.table_texture = None, None
+            # Manual mode: use the requested texture ids (None -> plain).
+            self.wall_texture = curated_texture("wall", wall_texture_id) if wall_texture_id else None
+            self.table_texture = curated_texture("table", table_texture_id) if table_texture_id else None
             self.table_color = (1, 1, 1)
+
+        # Resolved ids (None = plain) so scenes can record/restore their look.
+        self.wall_texture_id = self.wall_texture["id"] if self.wall_texture else None
+        self.table_texture_id = self.table_texture["id"] if self.table_texture else None
 
         if no_wall == False:
             wall_half = [3, 0.6, 1.5]
             # Tile by physical size: the visible 6x3 m face repeats the texture every tile_m.
             wall_repeat = (_tile_repeat((wall_half[0] * 2, wall_half[2] * 2), self.wall_texture["tile_m"])
                            if self.wall_texture else (1, 1))
-            self.wall = create_box(
+            self.wall_entity = create_box(
                 self.scene,
                 sapien.Pose(p=[0, 1, 1.5]),
                 half_size=wall_half,
@@ -150,12 +165,12 @@ class TidyScene:
                 texture=self.wall_texture,
                 texture_repeat=wall_repeat,
                 is_static=True,
-            )
+            ).actor
 
         if no_table == False:
             table_repeat = (_tile_repeat((table_length, table_width), self.table_texture["tile_m"])
                             if self.table_texture else (1, 1))
-            self.table = create_table(
+            self.table_entity = create_table(
                 self.scene,
                 sapien.Pose(p=[table_xy_bias[0], table_xy_bias[1], table_height]),
                 length=table_length,

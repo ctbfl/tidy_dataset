@@ -73,6 +73,20 @@
   </div>
 
   <div id="browser">
+    <div id="bg">
+      <div class="bg-row">
+        <label>Table</label>
+        <select id="bgTable"><option value="">(plain)</option></select>
+      </div>
+      <div class="bg-row">
+        <label>Wall</label>
+        <select id="bgWall"><option value="">(plain)</option></select>
+      </div>
+      <div class="bg-btns">
+        <button id="bgApply">Apply background</button>
+        <button id="bgRandom">Randomize</button>
+      </div>
+    </div>
     <div id="filters">
       <input id="search" placeholder="search id..." />
       <select id="tag"><option value="">all tags</option></select>
@@ -103,6 +117,7 @@ ws.onmessage = (ev) => {
   img.src = 'data:image/jpeg;base64,' + msg.image;
   selected = msg.state.selected;
   renderObjects(msg.state.objects);
+  if (msg.state.background) reflectBg(msg.state.background);
 };
 document.getElementById('save').addEventListener('click', () => send({ type: 'save' }));
 
@@ -200,7 +215,28 @@ document.getElementById('search').addEventListener('input', () => { clearTimeout
 document.getElementById('tag').addEventListener('change', loadAssets);
 document.getElementById('source').addEventListener('change', loadAssets);
 
+// background controls (table/wall texture pickers + randomize)
+let bgEcho = false;  // ignore the state echo right after we set the dropdowns
+function reflectBg(bg) {
+  if (bgEcho) { bgEcho = false; return; }
+  document.getElementById('bgTable').value = bg.table_texture || '';
+  document.getElementById('bgWall').value = bg.wall_texture || '';
+}
+async function loadTextures() {
+  const t = await (await fetch('/textures')).json();
+  const tbl = document.getElementById('bgTable'), wall = document.getElementById('bgWall');
+  for (const id of t.table) tbl.add(new Option(id, id));
+  for (const id of t.wall) wall.add(new Option(id, id));
+}
+document.getElementById('bgApply').addEventListener('click', () => {
+  bgEcho = true;
+  send({ type: 'set_bg', table_texture: document.getElementById('bgTable').value,
+         wall_texture: document.getElementById('bgWall').value });
+});
+document.getElementById('bgRandom').addEventListener('click', () => send({ type: 'randomize_bg' }));
+
 loadMeta();
+loadTextures();
 loadAssets();
 </script>
 </body>

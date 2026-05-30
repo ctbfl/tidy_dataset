@@ -26,6 +26,8 @@ def create_scene(
     table_width=0.7,
     table_height=0.74,
     table_thickness=0.05,
+    table_texture_id=None,
+    wall_texture_id=None,
     random_background=False,
     random_light = False,
     scene_fps=100.0,
@@ -82,6 +84,8 @@ def create_scene(
         table_width=table_width,
         table_height=table_height,
         table_thickness=table_thickness,
+        table_texture_id=table_texture_id,
+        wall_texture_id=wall_texture_id,
     )
     tidy_scene.table = {"length": table_length, "width": table_width,
                         "height": table_height, "thickness": table_thickness}
