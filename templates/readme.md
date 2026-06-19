@@ -36,5 +36,5 @@
 ```
 
 输出到 `data/scenarios/<scenario>/001/tidy.json …`（每个 scene 一个文件夹），`manifest` 已填、
-`items` 为空，等待在 handcraft 里手工摆放标注。之后 `messy.json` 由专门的脚本随机生成、与 tidy
-共享同一份 manifest。
+`items` 为空，等待在 handcraft 里手工摆放标注。标注完 tidy 后用 `simulations/gen_messy.py` 从
+`tidy.json` 随机生成 `messy.json`（与 tidy 共享同一份 manifest），见 `data/scenarios/readme.md`。

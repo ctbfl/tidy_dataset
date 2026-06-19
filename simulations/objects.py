@@ -97,6 +97,11 @@ class AssetLibrary:
             pybullet_collision_mesh=mesh(geometry["pybullet_collision_mesh"] or geometry["collision_mesh"]),
         )
 
+    def asset_json_path(self, asset_id: str) -> Path:
+        """On-disk record for an asset, to read fields not kept on Asset
+        (e.g. geometry.aabb_m)."""
+        return self._asset_json[asset_id]
+
     def is_enabled(self, asset_id: str) -> bool:
         """Read the asset's CURRENT semantics.enabled straight from disk (live, not a
         startup snapshot), so toggling an asset off takes effect immediately. Unknown

@@ -5,14 +5,22 @@
 
 ```
 <scenario>/<scene>/<arrangement>.json     例: office_desk/001/tidy.json
-                                               office_desk/001/messy.json   ← 之后由脚本生成
+                                               office_desk/001/messy.json
 ```
 
 - 同一个 scene 文件夹下，`tidy` 与 `messy`（以及将来可能的 `messy_2`…）**共享同一份
   `manifest`**（同一组物体），只是 `items`（摆放）不同。arrangement 名 = 文件名 stem，新增
   变体不需要改代码。
 - `tidy.json` 由 `simulations/gen_scenes.py` 从 `templates/<id>.json` 生成（manifest 已填、
-  items 空），再在 handcraft 里手工标注摆放；`messy.json` 之后用专门的脚本随机生成。
+  items 空），再在 handcraft 里手工标注摆放。
+- `messy.json` 由 `simulations/gen_messy.py` 从 `tidy.json` 随机生成：大件（高于阈值，如
+  display/lamp）保留 tidy 位姿，其余物体在桌面上随机直立散布，并用标注相机渲染分割图校验
+  「全部在画面内 + 每个 ≥80% 未被遮挡 + 左下/右下裁切角无物体」。
+
+```bash
+/home/hjs/miniforge3/envs/RoboTwin/bin/python simulations/gen_messy.py --scenario office_desk
+# --overwrite 重生成  --seed S 复现  --height-thresh 0.30 锚定高度(m)  --min-visible 0.80 未遮挡下限
+```
 
 ## 场景文件格式 v2（向后兼容 v1）
 
