@@ -11,3 +11,6 @@ assets/_texture_curate/
 # Heavy PBR maps are not versioned; meta.json (tile_m + CC0 source) is kept so the
 # library is reproducible. Re-download maps from the source recorded in each meta.json.
 assets/textures/**/*.jpg
+
+# Local append-only log of the sizing studio's scale edits; not a shared artifact.
+handcraft/scale_edits.jsonl
