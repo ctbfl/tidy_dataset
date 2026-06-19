@@ -1,0 +1,45 @@
+{
+  "template_id": "office_desk",
+  "scenario": "office_desk",
+  "name": "办公学习桌",
+  "note": "computer 组在 4 种电脑外设组合里加权择一(laptop-only / laptop+mouse / display+keyboard+mouse 各较常见,laptop+keyboard+mouse 小概率);其余 role 各自独立采样,book/pen 每场景最多 1 个。候选池优先用 tag;tag 不全的 role(mouse/phone)用 asset_ids 显式补全,tag 过宽的(cup)用 exclude_kw 剔除量杯/ramekin/餐具筒。被 disable 的资产在采样时实时剔除(见 resolve_candidates)。",
+  "table": {
+    "length": 1.2,
+    "width": 0.7,
+    "height": 0.74,
+    "thickness": 0.05
+  },
+  "groups": [
+    {
+      "group": "computer",
+      "options": [
+        { "weight": 3, "roles": [
+          { "role": "laptop", "count": 1, "tags": ["laptop"] }
+        ] },
+        { "weight": 3, "roles": [
+          { "role": "laptop", "count": 1, "tags": ["laptop"] },
+          { "role": "mouse",  "count": 1, "asset_ids": ["robotwin:glb:047_mouse:0", "robotwin:glb:047_mouse:1", "robotwin:glb:047_mouse:2"] }
+        ] },
+        { "weight": 3, "roles": [
+          { "role": "display",  "count": 1, "tags": ["screen"] },
+          { "role": "keyboard", "count": 1, "tags": ["keyboard"] },
+          { "role": "mouse",    "count": 1, "asset_ids": ["robotwin:glb:047_mouse:0", "robotwin:glb:047_mouse:1", "robotwin:glb:047_mouse:2"] }
+        ] },
+        { "weight": 1, "roles": [
+          { "role": "laptop",   "count": 1, "tags": ["laptop"] },
+          { "role": "keyboard", "count": 1, "tags": ["keyboard"] },
+          { "role": "mouse",    "count": 1, "asset_ids": ["robotwin:glb:047_mouse:0", "robotwin:glb:047_mouse:1", "robotwin:glb:047_mouse:2"] }
+        ] }
+      ]
+    }
+  ],
+  "roles": [
+    { "role": "lamp",       "count": [0, 1], "tags": ["lamp"] },
+    { "role": "pen",        "count": [0, 1], "tags": ["pen"] },
+    { "role": "book",       "count": [0, 1], "tags": ["book", "notebook"] },
+    { "role": "cup",        "count": [0, 1], "tags": ["cup", "mug"], "exclude_kw": ["measuring", "ramekin", "utensil"] },
+    { "role": "plant",      "count": [0, 1], "tags": ["plant", "plant_pot"] },
+    { "role": "phone",      "count": [0, 1], "asset_ids": ["robotwin:glb:077_phone:0", "robotwin:glb:077_phone:1", "robotwin:glb:077_phone:2", "robotwin:glb:077_phone:3", "robotwin:glb:077_phone:4"] },
+    { "role": "calculator", "count": [0, 1], "tags": ["calculator"] }
+  ]
+}

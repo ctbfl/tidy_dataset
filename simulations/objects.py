@@ -79,6 +79,7 @@ class AssetLibrary:
         self._object_tags = set(catalog["object_tags"])
         index = _read(root / "assets.json")["assets"]
         self.assets = {entry["asset_id"]: self._parse(root / entry["asset_json"]) for entry in index}
+        self._asset_json = {entry["asset_id"]: root / entry["asset_json"] for entry in index}
 
     def _parse(self, asset_json: Path) -> Asset:
         record = _read(asset_json)
@@ -95,6 +96,18 @@ class AssetLibrary:
             collision_mesh=mesh(geometry["collision_mesh"]),
             pybullet_collision_mesh=mesh(geometry["pybullet_collision_mesh"] or geometry["collision_mesh"]),
         )
+
+    def is_enabled(self, asset_id: str) -> bool:
+        """Read the asset's CURRENT semantics.enabled straight from disk (live, not a
+        startup snapshot), so toggling an asset off takes effect immediately. Unknown
+        ids and read errors count as disabled / enabled-by-default respectively."""
+        path = self._asset_json.get(asset_id)
+        if path is None:
+            return False
+        try:
+            return _read(path).get("semantics", {}).get("enabled", True) is not False
+        except Exception:
+            return True
 
     def __getitem__(self, asset_id: str) -> Asset:
         return self.assets[asset_id]
