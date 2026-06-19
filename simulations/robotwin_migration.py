@@ -109,7 +109,7 @@ class TidyScene:
         table_width=0.74,
         table_height=0.74,
         table_thickness=0.05,
-        no_wall=False,
+        no_wall=True,
         no_table=False,
         table_texture_id=None,
         wall_texture_id=None,

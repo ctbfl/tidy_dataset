@@ -42,14 +42,13 @@ def create_scene(
     else:
         tidy_scene.render_freq = render_freq
 
+    no_wall=True  # walls removed by default; pass wall_texture_id has no effect while this holds
     if use_hdri==True:
         have_ground=False
         no_default_light=True
-        no_wall=True
     else:
         have_ground=True
         no_default_light=False
-        no_wall=False
 
     tidy_scene.setup_scene(
         have_ground = have_ground,
