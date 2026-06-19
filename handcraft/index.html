@@ -85,6 +85,7 @@
     <div id="picker">
       <div class="row"><label>Scenario</label><select id="scenario"></select></div>
       <div class="row"><label>Scene</label><select id="sceneSel"></select></div>
+      <div class="row"><label>Arrange</label><select id="arrangeSel"></select></div>
       <div id="progress"></div>
     </div>
 
@@ -219,37 +220,55 @@ function renderManifest(manifest) {
   }
   document.getElementById('progress').textContent =
     manifest.length ? `${placed} / ${manifest.length} placed` : '(no checklist — load a scenario)';
-  const opt = [...sceneSel.options].find((o) => o.value === sceneSel.value);
-  if (opt && manifest.length) opt.text = `${sceneSel.value} — ${placed}/${manifest.length}`;
+  const opt = [...arrangeSel.options].find((o) => o.value === arrangeSel.value);
+  if (opt && manifest.length) opt.text = `${arrangeSel.value} — ${placed}/${manifest.length}`;
 }
 
-// scenario / scene pickers
+// scenario / scene / arrangement pickers. /scenario_scenes returns
+// [{scene, arrangements: [{name, placed, total}]}]; a scene is a folder, an
+// arrangement (tidy/messy/...) is one file in it.
 const scenarioSel = document.getElementById('scenario');
 const sceneSel = document.getElementById('sceneSel');
+const arrangeSel = document.getElementById('arrangeSel');
+let scenesCache = [];
+const arrangeLabel = (a) => `${a.name} — ${a.placed}/${a.total}`;
+
 async function loadScenarios() {
   const { scenarios } = await (await fetch('/scenarios')).json();
   scenarioSel.innerHTML = '';
   for (const s of scenarios) scenarioSel.add(new Option(s, s));
   if (scenarios.length) await loadScenes();
 }
-async function loadScenes() {
-  const scenario = scenarioSel.value;
-  const { scenes } = await (await fetch('/scenario_scenes?scenario=' + encodeURIComponent(scenario))).json();
-  sceneSel.innerHTML = '';
-  for (const s of scenes) sceneSel.add(new Option(`${s.scene} — ${s.placed}/${s.total}`, s.scene));
-  if (scenes.length) loadSceneNow();
-}
-function loadSceneNow() { send({ type: 'load_scene', scenario: scenarioSel.value, scene: sceneSel.value }); }
-async function refreshSceneProgress() {
-  if (!scenarioSel.value) return;
-  const keep = sceneSel.value;
+async function fetchScenes() {
   const { scenes } = await (await fetch('/scenario_scenes?scenario=' + encodeURIComponent(scenarioSel.value))).json();
+  scenesCache = scenes;
+}
+async function loadScenes() {
+  await fetchScenes();
   sceneSel.innerHTML = '';
-  for (const s of scenes) sceneSel.add(new Option(`${s.scene} — ${s.placed}/${s.total}`, s.scene));
-  sceneSel.value = keep;
+  for (const s of scenesCache) sceneSel.add(new Option(s.scene, s.scene));
+  if (scenesCache.length) loadArrangements();
+}
+function loadArrangements() {
+  const sc = scenesCache.find((s) => s.scene === sceneSel.value);
+  arrangeSel.innerHTML = '';
+  for (const a of (sc ? sc.arrangements : [])) arrangeSel.add(new Option(arrangeLabel(a), a.name));
+  if (arrangeSel.options.length) loadSceneNow();
+}
+function loadSceneNow() {
+  send({ type: 'load_scene', scenario: scenarioSel.value, scene: sceneSel.value, arrangement: arrangeSel.value });
+}
+async function refreshSceneProgress() {  // after a save: re-read counts, keep selection
+  if (!scenarioSel.value) return;
+  await fetchScenes();
+  const sc = scenesCache.find((s) => s.scene === sceneSel.value);
+  const a = sc && sc.arrangements.find((x) => x.name === arrangeSel.value);
+  const opt = [...arrangeSel.options].find((o) => o.value === arrangeSel.value);
+  if (a && opt) opt.text = arrangeLabel(a);
 }
 scenarioSel.addEventListener('change', loadScenes);
-sceneSel.addEventListener('change', loadSceneNow);
+sceneSel.addEventListener('change', loadArrangements);
+arrangeSel.addEventListener('change', loadSceneNow);
 
 // extra-object browser (full library)
 async function loadMeta() {

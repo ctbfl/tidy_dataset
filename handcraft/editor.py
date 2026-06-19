@@ -36,6 +36,7 @@ class SceneEditor:
         # scenario annotation state (set by load_scene_dict)
         self.scenario: str | None = None
         self.scene_id: str | None = None
+        self.arrangement: str | None = None  # "tidy" / "messy" / ... (== the file stem)
         self.template: str | None = None
         self.manifest: list[dict] = []          # [{slot, role, asset_id}, ...]
         self.slot_of: dict[str, str | None] = {}  # scene_id -> manifest slot (None = extra)
@@ -72,6 +73,7 @@ class SceneEditor:
         return {"objects": list(self.objects), "selected": self.selected,
                 "background": self.background_state(),
                 "scenario": self.scenario, "scene_id": self.scene_id,
+                "arrangement": self.arrangement,
                 "slots": {oid: self.slot_of.get(oid) for oid in self.objects},
                 "manifest": [{**m, "placed": m["slot"] in placed} for m in self.manifest]}
 
@@ -87,6 +89,7 @@ class SceneEditor:
             "version": 2,
             "scenario": self.scenario,
             "scene_id": self.scene_id,
+            "arrangement": self.arrangement,
             "template": self.template,
             "table": ts.table,
             "table_texture": getattr(ts, "table_texture_id", None),
@@ -138,6 +141,7 @@ class SceneEditor:
         self.clear()
         self.scenario = data.get("scenario")
         self.scene_id = data.get("scene_id")
+        self.arrangement = data.get("arrangement")
         self.template = data.get("template")
         self.manifest = list(data.get("manifest", []))
         self.rebuild_background(

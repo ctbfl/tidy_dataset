@@ -8,8 +8,9 @@ Run (RoboTwin env):
     /home/hjs/miniforge3/envs/RoboTwin/bin/python simulations/gen_scenes.py --template office_desk --n 20
     .../python simulations/gen_scenes.py --template office_desk --n 5 --start 21 --seed 7
 
-Writes to data/scenarios/<scenario>/<NNN>.json (scenario defaults to the
-template id). Existing scene files are skipped unless --overwrite is given.
+Writes to data/scenarios/<scenario>/<NNN>/tidy.json (scenario defaults to the
+template id); each scene is a folder so other arrangements (messy, ...) can sit
+beside tidy later. Existing scene files are skipped unless --overwrite is given.
 """
 from __future__ import annotations
 
@@ -25,11 +26,13 @@ REPO = Path(__file__).resolve().parents[1]
 SCENARIOS_DIR = REPO / "data" / "scenarios"
 
 
-def build_scene(template: dict, manifest: list[dict], scenario: str, scene_id: str) -> dict:
+def build_scene(template: dict, manifest: list[dict], scenario: str, scene_id: str,
+                arrangement: str = "tidy") -> dict:
     return {
         "version": 2,
         "scenario": scenario,
         "scene_id": scene_id,
+        "arrangement": arrangement,
         "template": template["template_id"],
         "table": template["table"],
         "table_texture": None,
@@ -61,12 +64,13 @@ def main() -> None:
 
     for k in range(args.n):
         scene_id = f"{args.start + k:03d}"
-        path = out_dir / f"{scene_id}.json"
+        path = out_dir / scene_id / "tidy.json"  # one folder per scene, tidy.json to hand-annotate
         manifest = sample_manifest(template, library, rng)  # draw before skip-check so the seed stays aligned
         if path.exists() and not args.overwrite:
             print(f"[skip]  {path.relative_to(REPO)} exists (use --overwrite)")
             continue
         scene = build_scene(template, manifest, scenario, scene_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(scene, indent=2, ensure_ascii=False))
         roles = ", ".join(m["slot"] for m in manifest)
         print(f"[write] {path.relative_to(REPO)}  {len(manifest)} items: {roles}")

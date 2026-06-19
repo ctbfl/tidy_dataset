@@ -25,7 +25,7 @@ from robotwin_utils import curated_textures
 
 HERE = Path(__file__).resolve().parent
 SAVE_DIR = HERE.parent / "data" / "tidy_scene_v0"          # legacy free-form scenes
-SCENARIOS_DIR = HERE.parent / "data" / "scenarios"          # <scenario>/<NNN>.json
+SCENARIOS_DIR = HERE.parent / "data" / "scenarios"          # <scenario>/<scene>/<arrangement>.json
 GPU = threading.Lock()  # all SAPIEN rendering is single-threaded
 
 editor = SceneEditor()
@@ -71,11 +71,13 @@ def _load_scene(name: str) -> None:
         editor.load_scene_dict(json.loads(path.read_text()))
 
 
-# -- scenarios: data/scenarios/<scenario>/<NNN>.json ----------------------- #
-def _scenario_scene_path(scenario: str, scene: str) -> Path:
-    path = (SCENARIOS_DIR / scenario / f"{Path(scene).stem}.json").resolve()
-    if path.parent.parent != SCENARIOS_DIR.resolve():  # scenario must be a direct subdir
-        raise ValueError(f"invalid scenario/scene: {scenario}/{scene}")
+# -- scenarios: data/scenarios/<scenario>/<scene>/<arrangement>.json ------- #
+# Each scene is a folder holding one file per arrangement (tidy / messy / ...);
+# the arrangement name is just the file stem, so new variants need no code.
+def _scenario_scene_path(scenario: str, scene: str, arrangement: str) -> Path:
+    path = (SCENARIOS_DIR / scenario / Path(scene).stem / f"{Path(arrangement).stem}.json").resolve()
+    if path.parent.parent.parent != SCENARIOS_DIR.resolve():  # <scenario>/<scene>/<file>
+        raise ValueError(f"invalid scenario/scene/arrangement: {scenario}/{scene}/{arrangement}")
     return path
 
 
@@ -85,28 +87,38 @@ def _list_scenarios() -> list[str]:
     return sorted(p.name for p in SCENARIOS_DIR.iterdir() if p.is_dir())
 
 
+def _arrangement_progress(path: Path) -> dict:
+    data = json.loads(path.read_text())
+    return {"name": path.stem,
+            "placed": sum(1 for i in data.get("items", []) if i.get("slot")),
+            "total": len(data.get("manifest", []))}
+
+
 def _list_scenario_scenes(scenario: str) -> list[dict]:
+    """One entry per scene folder, listing each arrangement file it contains."""
     out = []
-    for p in sorted((SCENARIOS_DIR / scenario).glob("*.json")):
-        data = json.loads(p.read_text())
-        out.append({"scene": p.stem,
-                    "placed": sum(1 for i in data.get("items", []) if i.get("slot")),
-                    "total": len(data.get("manifest", []))})
+    base = SCENARIOS_DIR / scenario
+    if not base.is_dir():
+        return out
+    for d in sorted(p for p in base.iterdir() if p.is_dir()):
+        arrangements = [_arrangement_progress(f) for f in sorted(d.glob("*.json"))]
+        out.append({"scene": d.name, "arrangements": arrangements})
     return out
 
 
-def _load_scenario_scene(scenario: str, scene: str) -> None:
-    path = _scenario_scene_path(scenario, scene)
+def _load_scenario_scene(scenario: str, scene: str, arrangement: str) -> None:
+    path = _scenario_scene_path(scenario, scene, arrangement)
     if not path.is_file():
-        raise FileNotFoundError(f"{scenario}/{scene}")
+        raise FileNotFoundError(f"{scenario}/{scene}/{arrangement}")
     with GPU:
         editor.load_scene_dict(json.loads(path.read_text()))
 
 
 def _save_scenario_scene() -> str:
-    path = _scenario_scene_path(editor.scenario, editor.scene_id)
+    path = _scenario_scene_path(editor.scenario, editor.scene_id, editor.arrangement)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(editor.scene_dict(), indent=2, ensure_ascii=False))
-    return f"{editor.scenario}/{path.name}"
+    return f"{editor.scenario}/{editor.scene_id}/{path.name}"
 
 
 app = FastAPI(title="tidy handcraft")
@@ -207,8 +219,9 @@ async def ws(socket: WebSocket):
                 _load_scene(msg["name"])
                 await socket.send_json({"type": "loaded", "name": msg["name"]})
             elif kind == "load_scene":
-                _load_scenario_scene(msg["scenario"], msg["scene"])
-                await socket.send_json({"type": "loaded", "name": f'{msg["scenario"]}/{msg["scene"]}'})
+                _load_scenario_scene(msg["scenario"], msg["scene"], msg["arrangement"])
+                await socket.send_json(
+                    {"type": "loaded", "name": f'{msg["scenario"]}/{msg["scene"]}/{msg["arrangement"]}'})
             await socket.send_json(_frame())
     except WebSocketDisconnect:
         return

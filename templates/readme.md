@@ -35,5 +35,6 @@
 # --start N 起始编号  --seed S 复现采样  --overwrite 覆盖已存在文件
 ```
 
-输出到 `data/scenarios/<scenario>/001.json …`，每个文件 `manifest` 已填、`items` 为空，
-等待在 handcraft 里手工摆放标注。
+输出到 `data/scenarios/<scenario>/001/tidy.json …`（每个 scene 一个文件夹），`manifest` 已填、
+`items` 为空，等待在 handcraft 里手工摆放标注。之后 `messy.json` 由专门的脚本随机生成、与 tidy
+共享同一份 manifest。

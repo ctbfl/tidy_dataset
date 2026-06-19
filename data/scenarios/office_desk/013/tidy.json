@@ -2,6 +2,7 @@
   "version": 2,
   "scenario": "office_desk",
   "scene_id": "013",
+  "arrangement": "tidy",
   "template": "office_desk",
   "table": {
     "length": 1.2,

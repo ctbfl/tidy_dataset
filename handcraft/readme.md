@@ -6,9 +6,10 @@
 /home/hjs/miniforge3/envs/RoboTwin/bin/python handcraft/server.py   # http://127.0.0.1:8099
 ```
 
-- **scenario 标注模式**：右上选 scenario / scene，右侧按该 scene 的 manifest 显示待摆物体清单
-  （小预览图）；拖卡片到桌面摆放，放好的卡片打 ✅；Save 写回 `data/scenarios/<scenario>/<NNN>.json`
-  的 `items`（保留 manifest）。先用 `simulations/gen_scenes.py` 生成 scene，见 `templates/readme.md`。
+- **scenario 标注模式**：右上选 scenario / scene / arrangement（tidy/messy…），右侧按该 scene 的
+  manifest 显示待摆物体清单（小预览图）；拖卡片到桌面摆放，放好的卡片打 ✅；Save 写回
+  `data/scenarios/<scenario>/<scene>/<arrangement>.json` 的 `items`（保留 manifest）。先用
+  `simulations/gen_scenes.py` 生成 scene 的 `tidy.json`，见 `templates/readme.md`。
 - **额外物体**：展开右侧「Add extra object」从全资产库补放（记为无 slot 的 extra）。
 - **背景**：可选桌面/墙体纹理或随机化。
 - **操作**：拖资产落桌 · 点击选中 · WASD 平移 · Q/E 偏航 · Clear 清空已摆物体（保留清单）。

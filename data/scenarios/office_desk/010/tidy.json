@@ -1,7 +1,8 @@
 {
   "version": 2,
   "scenario": "office_desk",
-  "scene_id": "019",
+  "scene_id": "010",
+  "arrangement": "tidy",
   "template": "office_desk",
   "table": {
     "length": 1.2,
@@ -15,36 +16,31 @@
     {
       "slot": "laptop-1",
       "role": "laptop",
-      "asset_id": "robotwin:glb:015_laptop:0"
-    },
-    {
-      "slot": "plant-1",
-      "role": "plant",
-      "asset_id": "robotwin:glb:012_plant-pot:3"
+      "asset_id": "robotwin:glb:015_laptop:2"
     }
   ],
   "items": [
     {
       "slot": "laptop-1",
-      "asset_id": "robotwin:glb:015_laptop:0",
+      "asset_id": "robotwin:glb:015_laptop:2",
       "transform": [
         [
           1.0,
           0.0,
           0.0,
-          0.030141858384013176
+          0.01637180522084236
         ],
         [
           0.0,
           1.0,
           0.0,
-          -0.002176329493522644
+          -0.014376387000083923
         ],
         [
           0.0,
           0.0,
           1.0,
-          0.7885542511940002
+          0.800786018371582
         ],
         [
           0.0,
@@ -55,26 +51,56 @@
       ]
     },
     {
-      "slot": "plant-1",
-      "asset_id": "robotwin:glb:012_plant-pot:3",
+      "slot": null,
+      "asset_id": "robotwin:glb:101_milk-tea:2",
       "transform": [
         [
           1.0,
           0.0,
           0.0,
-          0.4193648099899292
+          0.4084566533565521
         ],
         [
           0.0,
           1.0,
           0.0,
-          0.1829925924539566
+          0.11729082465171814
         ],
         [
           0.0,
           0.0,
           1.0,
           0.7399998903274536
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": null,
+      "asset_id": "robotwin:glb:092_notebook:0",
+      "transform": [
+        [
+          5.960464477539063e-08,
+          1.0,
+          0.0,
+          -0.435265451669693
+        ],
+        [
+          -1.0,
+          5.960464477539063e-08,
+          -0.0,
+          0.17191223800182343
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          0.7400000691413879
         ],
         [
           0.0,

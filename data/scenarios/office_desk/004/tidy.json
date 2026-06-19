@@ -1,7 +1,8 @@
 {
   "version": 2,
   "scenario": "office_desk",
-  "scene_id": "005",
+  "scene_id": "004",
+  "arrangement": "tidy",
   "template": "office_desk",
   "table": {
     "length": 1.2,
@@ -13,34 +14,34 @@
   "wall_texture": null,
   "manifest": [
     {
-      "slot": "display-1",
-      "role": "display",
-      "asset_id": "robotwin:glb:097_screen:1"
+      "slot": "laptop-1",
+      "role": "laptop",
+      "asset_id": "robotwin:glb:015_laptop:7"
     },
     {
       "slot": "keyboard-1",
       "role": "keyboard",
-      "asset_id": "robotwin:glb:116_keyboard:1"
+      "asset_id": "robotwin:glb:116_keyboard:3"
     },
     {
       "slot": "mouse-1",
       "role": "mouse",
-      "asset_id": "robotwin:glb:047_mouse:0"
+      "asset_id": "robotwin:glb:047_mouse:2"
     },
     {
-      "slot": "pen-1",
-      "role": "pen",
-      "asset_id": "robotwin:glb:058_markpen:1"
+      "slot": "lamp-1",
+      "role": "lamp",
+      "asset_id": "objaverse:glb:table_lamp:0"
     },
     {
       "slot": "cup-1",
       "role": "cup",
-      "asset_id": "robotwin:glb:039_mug:7"
+      "asset_id": "gso:obj:ACE_Coffee_Mug_Kristen_16_oz_cup"
     },
     {
-      "slot": "phone-1",
-      "role": "phone",
-      "asset_id": "robotwin:glb:077_phone:4"
+      "slot": "plant-1",
+      "role": "plant",
+      "asset_id": "robotwin:glb:012_plant-pot:3"
     },
     {
       "slot": "calculator-1",
@@ -50,26 +51,26 @@
   ],
   "items": [
     {
-      "slot": "display-1",
-      "asset_id": "robotwin:glb:097_screen:1",
+      "slot": "laptop-1",
+      "asset_id": "robotwin:glb:015_laptop:7",
       "transform": [
         [
           1.0,
           0.0,
           0.0,
-          0.009487535804510117
+          0.022307999432086945
         ],
         [
           0.0,
           1.0,
           0.0,
-          0.23828940093517303
+          0.19866807758808136
         ],
         [
           0.0,
           0.0,
           1.0,
-          0.7400000095367432
+          0.7996751666069031
         ],
         [
           0.0,
@@ -81,25 +82,25 @@
     },
     {
       "slot": "keyboard-1",
-      "asset_id": "robotwin:glb:116_keyboard:1",
+      "asset_id": "robotwin:glb:116_keyboard:3",
       "transform": [
         [
           1.0,
           0.0,
           0.0,
-          -0.03845805674791336
+          0.00734686478972435
         ],
         [
           0.0,
           1.0,
           0.0,
-          -0.05893698334693909
+          -0.13766831159591675
         ],
         [
           0.0,
           0.0,
           1.0,
-          0.7379899621009827
+          0.7383293509483337
         ],
         [
           0.0,
@@ -111,25 +112,25 @@
     },
     {
       "slot": "mouse-1",
-      "asset_id": "robotwin:glb:047_mouse:0",
+      "asset_id": "robotwin:glb:047_mouse:2",
       "transform": [
         [
-          1.0,
+          -1.0,
+          -3.5762712968789856e-07,
           0.0,
+          0.33721810579299927
+        ],
+        [
+          3.5762712968789856e-07,
+          -1.0,
           0.0,
-          0.2800535261631012
+          -0.15074409544467926
         ],
         [
           0.0,
-          1.0,
-          0.0,
-          -0.06469440460205078
-        ],
-        [
-          0.0,
           0.0,
           1.0,
-          0.7399998903274536
+          0.7400000095367432
         ],
         [
           0.0,
@@ -147,49 +148,19 @@
           1.0,
           0.0,
           0.0,
-          -0.32918497920036316
+          -0.2530066967010498
         ],
         [
           0.0,
           1.0,
           0.0,
-          0.20031817257404327
+          0.123570516705513
         ],
         [
           0.0,
           0.0,
           1.0,
-          0.7399998903274536
-        ],
-        [
-          0.0,
-          0.0,
-          0.0,
-          1.0
-        ]
-      ]
-    },
-    {
-      "slot": "phone-1",
-      "asset_id": "robotwin:glb:077_phone:4",
-      "transform": [
-        [
-          1.0,
-          0.0,
-          0.0,
-          -0.19585591554641724
-        ],
-        [
-          0.0,
-          1.0,
-          0.0,
-          0.18987758457660675
-        ],
-        [
-          0.0,
-          0.0,
-          1.0,
-          0.7400000691413879
+          0.7400000095367432
         ],
         [
           0.0,
@@ -201,25 +172,25 @@
     },
     {
       "slot": "cup-1",
-      "asset_id": "robotwin:glb:039_mug:7",
+      "asset_id": "gso:obj:ACE_Coffee_Mug_Kristen_16_oz_cup",
       "transform": [
         [
-          -8.344650268554688e-07,
-          0.9999999403953552,
+          1.0,
           0.0,
-          0.4520959258079529
+          0.0,
+          0.3227674067020416
         ],
         [
-          -0.9999999403953552,
-          -8.344650268554688e-07,
           0.0,
-          0.17566253244876862
+          1.0,
+          0.0,
+          0.17442460358142853
         ],
         [
           0.0,
           0.0,
           1.0,
-          0.7399998903274536
+          0.7400197386741638
         ],
         [
           0.0,
@@ -230,26 +201,56 @@
       ]
     },
     {
-      "slot": "pen-1",
-      "asset_id": "robotwin:glb:058_markpen:1",
+      "slot": "plant-1",
+      "asset_id": "robotwin:glb:012_plant-pot:3",
       "transform": [
         [
           1.0,
           0.0,
           0.0,
-          0.16709311306476593
+          0.46704503893852234
         ],
         [
           0.0,
           1.0,
           0.0,
-          0.11384136974811554
+          0.17275218665599823
         ],
         [
           0.0,
           0.0,
           1.0,
-          0.7604342103004456
+          0.7399999499320984
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "lamp-1",
+      "asset_id": "objaverse:glb:table_lamp:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.498055100440979
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.14897556602954865
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          1.3412588834762573
         ],
         [
           0.0,
