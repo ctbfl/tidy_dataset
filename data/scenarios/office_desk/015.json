@@ -1,0 +1,228 @@
+{
+  "version": 2,
+  "scenario": "office_desk",
+  "scene_id": "015",
+  "template": "office_desk",
+  "table": {
+    "length": 1.2,
+    "width": 0.7,
+    "height": 0.74,
+    "thickness": 0.05
+  },
+  "table_texture": null,
+  "wall_texture": null,
+  "manifest": [
+    {
+      "slot": "laptop-1",
+      "role": "laptop",
+      "asset_id": "robotwin:glb:015_laptop:1"
+    },
+    {
+      "slot": "mouse-1",
+      "role": "mouse",
+      "asset_id": "robotwin:glb:047_mouse:1"
+    },
+    {
+      "slot": "pen-1",
+      "role": "pen",
+      "asset_id": "robotwin:glb:058_markpen:2"
+    },
+    {
+      "slot": "cup-1",
+      "role": "cup",
+      "asset_id": "robotwin:glb:039_mug:0"
+    },
+    {
+      "slot": "plant-1",
+      "role": "plant",
+      "asset_id": "robotwin:glb:012_plant-pot:3"
+    },
+    {
+      "slot": "calculator-1",
+      "role": "calculator",
+      "asset_id": "robotwin:glb:017_calculator:3"
+    }
+  ],
+  "items": [
+    {
+      "slot": "laptop-1",
+      "asset_id": "robotwin:glb:015_laptop:1",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.0003988891839981079
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.007247596979141235
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.8029691576957703
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "mouse-1",
+      "asset_id": "robotwin:glb:047_mouse:1",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.2362295240163803
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.1068987250328064
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "cup-1",
+      "asset_id": "robotwin:glb:039_mug:0",
+      "transform": [
+        [
+          -1.1920928955078125e-07,
+          1.0000001192092896,
+          0.0,
+          0.44612231850624084
+        ],
+        [
+          -1.0000001192092896,
+          -1.1920928955078125e-07,
+          -0.0,
+          0.19530537724494934
+        ],
+        [
+          -0.0,
+          0.0,
+          1.0,
+          0.7400000691413879
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "plant-1",
+      "asset_id": "robotwin:glb:012_plant-pot:3",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.4546090364456177
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.20635321736335754
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "calculator-1",
+      "asset_id": "robotwin:glb:017_calculator:3",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.32265669107437134
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.21796216070652008
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7391018867492676
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "pen-1",
+      "asset_id": "robotwin:glb:058_markpen:2",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.2260717898607254
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.13809940218925476
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7494896650314331
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  ]
+}

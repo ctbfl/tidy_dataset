@@ -1,0 +1,228 @@
+{
+  "version": 2,
+  "scenario": "office_desk",
+  "scene_id": "017",
+  "template": "office_desk",
+  "table": {
+    "length": 1.2,
+    "width": 0.7,
+    "height": 0.74,
+    "thickness": 0.05
+  },
+  "table_texture": null,
+  "wall_texture": null,
+  "manifest": [
+    {
+      "slot": "laptop-1",
+      "role": "laptop",
+      "asset_id": "robotwin:glb:015_laptop:0"
+    },
+    {
+      "slot": "mouse-1",
+      "role": "mouse",
+      "asset_id": "robotwin:glb:047_mouse:0"
+    },
+    {
+      "slot": "lamp-1",
+      "role": "lamp",
+      "asset_id": "objaverse:glb:table_lamp:1"
+    },
+    {
+      "slot": "pen-1",
+      "role": "pen",
+      "asset_id": "robotwin:urdf:marker:004"
+    },
+    {
+      "slot": "cup-1",
+      "role": "cup",
+      "asset_id": "robotwin:glb:039_mug:7"
+    },
+    {
+      "slot": "calculator-1",
+      "role": "calculator",
+      "asset_id": "robotwin:glb:017_calculator:2"
+    }
+  ],
+  "items": [
+    {
+      "slot": "laptop-1",
+      "asset_id": "robotwin:glb:015_laptop:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.01654127612709999
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.07410790026187897
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.788554310798645
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "mouse-1",
+      "asset_id": "robotwin:glb:047_mouse:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.2977173924446106
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.17903973162174225
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "lamp-1",
+      "asset_id": "objaverse:glb:table_lamp:1",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.46407613158226013
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.19533583521842957
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7399898767471313
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "pen-1",
+      "asset_id": "robotwin:urdf:marker:004",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.38581162691116333
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.18819083273410797
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7483113408088684
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "calculator-1",
+      "asset_id": "robotwin:glb:017_calculator:2",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.4823598265647888
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.18299253284931183
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7399998903274536
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "cup-1",
+      "asset_id": "robotwin:glb:039_mug:7",
+      "transform": [
+        [
+          -0.49999868869781494,
+          -0.8660262823104858,
+          0.0,
+          -0.29473328590393066
+        ],
+        [
+          0.8660262823104858,
+          -0.49999868869781494,
+          0.0,
+          -0.18291397392749786
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7399998903274536
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  ]
+}

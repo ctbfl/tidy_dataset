@@ -1,0 +1,308 @@
+{
+  "version": 2,
+  "scenario": "office_desk",
+  "scene_id": "001",
+  "template": "office_desk",
+  "table": {
+    "length": 1.2,
+    "width": 0.7,
+    "height": 0.74,
+    "thickness": 0.05
+  },
+  "table_texture": null,
+  "wall_texture": null,
+  "manifest": [
+    {
+      "slot": "laptop-1",
+      "role": "laptop",
+      "asset_id": "robotwin:glb:015_laptop:5"
+    },
+    {
+      "slot": "keyboard-1",
+      "role": "keyboard",
+      "asset_id": "robotwin:glb:116_keyboard:3"
+    },
+    {
+      "slot": "mouse-1",
+      "role": "mouse",
+      "asset_id": "robotwin:glb:047_mouse:2"
+    },
+    {
+      "slot": "lamp-1",
+      "role": "lamp",
+      "asset_id": "objaverse:glb:table_lamp:4"
+    },
+    {
+      "slot": "pen-1",
+      "role": "pen",
+      "asset_id": "robotwin:glb:093_brush-pen:0"
+    },
+    {
+      "slot": "pen-2",
+      "role": "pen",
+      "asset_id": "robotwin:glb:058_markpen:4"
+    },
+    {
+      "slot": "book-1",
+      "role": "book",
+      "asset_id": "robotwin:glb:092_notebook:0"
+    },
+    {
+      "slot": "book-2",
+      "role": "book",
+      "asset_id": "robotwin:glb:043_book:1"
+    },
+    {
+      "slot": "plant-1",
+      "role": "plant",
+      "asset_id": "robotwin:glb:012_plant-pot:0"
+    },
+    {
+      "slot": "calculator-1",
+      "role": "calculator",
+      "asset_id": "robotwin:glb:017_calculator:4"
+    }
+  ],
+  "items": [
+    {
+      "slot": "laptop-1",
+      "asset_id": "robotwin:glb:015_laptop:5",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -4.404038190841675e-05
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.2573457956314087
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.8036437630653381
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "keyboard-1",
+      "asset_id": "robotwin:glb:116_keyboard:3",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.00845286250114441
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.12265424430370331
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7383293509483337
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "mouse-1",
+      "asset_id": "robotwin:glb:047_mouse:2",
+      "transform": [
+        [
+          -1.0,
+          -3.874290257499524e-07,
+          0.0,
+          0.38333457708358765
+        ],
+        [
+          3.874290257499524e-07,
+          -1.0,
+          0.0,
+          -0.10260911285877228
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "lamp-1",
+      "asset_id": "objaverse:glb:table_lamp:4",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.45959967374801636
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.2740783393383026
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7407559752464294
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "pen-2",
+      "asset_id": "robotwin:glb:058_markpen:4",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.3040739893913269
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.01655494049191475
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7482234835624695
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "book-1",
+      "asset_id": "robotwin:glb:092_notebook:0",
+      "transform": [
+        [
+          -1.1920928955078125e-07,
+          -1.0000001192092896,
+          0.0,
+          -0.47228074073791504
+        ],
+        [
+          1.0000001192092896,
+          -1.1920928955078125e-07,
+          0.0,
+          0.05421261116862297
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7481557726860046
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "plant-1",
+      "asset_id": "robotwin:glb:012_plant-pot:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.453412264585495
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.274078369140625
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7401551609860983
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "calculator-1",
+      "asset_id": "robotwin:glb:017_calculator:4",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.3592722713947296
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.033399421721696854
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7378760576248169
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  ]
+}

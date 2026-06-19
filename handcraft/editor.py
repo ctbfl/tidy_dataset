@@ -32,6 +32,13 @@ class SceneEditor:
         self.camera = add_camera(self.scene_wrap)
         self.selected: str | None = None
         self._seg = self._pos = self._model = None  # filled by render()
+        self._counter = 0  # monotonic; gives every spawn a unique scene id
+        # scenario annotation state (set by load_scene_dict)
+        self.scenario: str | None = None
+        self.scene_id: str | None = None
+        self.template: str | None = None
+        self.manifest: list[dict] = []          # [{slot, role, asset_id}, ...]
+        self.slot_of: dict[str, str | None] = {}  # scene_id -> manifest slot (None = extra)
 
     @property
     def objects(self) -> dict:
@@ -61,8 +68,12 @@ class SceneEditor:
 
     # -- state for the client -------------------------------------------- #
     def state(self) -> dict:
+        placed = {s for s in self.slot_of.values() if s}
         return {"objects": list(self.objects), "selected": self.selected,
-                "background": self.background_state()}
+                "background": self.background_state(),
+                "scenario": self.scenario, "scene_id": self.scene_id,
+                "slots": {oid: self.slot_of.get(oid) for oid in self.objects},
+                "manifest": [{**m, "placed": m["slot"] in placed} for m in self.manifest]}
 
     def background_state(self) -> dict:
         ts = self.scene_wrap
@@ -73,18 +84,26 @@ class SceneEditor:
     def scene_dict(self) -> dict:
         ts = self.scene_wrap
         return {
-            "version": 1,
+            "version": 2,
+            "scenario": self.scenario,
+            "scene_id": self.scene_id,
+            "template": self.template,
             "table": ts.table,
             "table_texture": getattr(ts, "table_texture_id", None),
             "wall_texture": getattr(ts, "wall_texture_id", None),
-            "items": [{"asset_id": o.asset.id, "transform": o.get_pose().to_transformation_matrix().tolist()}
+            "manifest": self.manifest,
+            "items": [{"slot": self.slot_of.get(o.id), "asset_id": o.asset.id,
+                       "transform": o.get_pose().to_transformation_matrix().tolist()}
                       for o in self.objects.values()],
         }
 
     def clear(self) -> None:
+        """Remove placed objects but keep the manifest, so the same scene can be
+        re-annotated from scratch."""
         for o in list(self.objects.values()):
             self.scene.remove_entity(o.entity)
         self.objects.clear()
+        self.slot_of.clear()
         self.selected = None
 
     # -- background (table dims + textures) ------------------------------- #
@@ -111,35 +130,55 @@ class SceneEditor:
                                 wall_texture_id=wall_texture_id, random_background=False)
 
     def load_scene_dict(self, data: dict) -> None:
-        """Replace the scene with a saved v1 dict (table dims + textures + items)."""
-        if data.get("version") != 1:
-            raise ValueError(f"unsupported scene version: {data.get('version')!r} (expected 1)")
+        """Replace the scene with a saved dict. v1 = table + textures + items;
+        v2 adds scenario/scene_id/template + a manifest, and items carry a slot."""
+        version = data.get("version")
+        if version not in (1, 2):
+            raise ValueError(f"unsupported scene version: {version!r} (expected 1 or 2)")
         self.clear()
+        self.scenario = data.get("scenario")
+        self.scene_id = data.get("scene_id")
+        self.template = data.get("template")
+        self.manifest = list(data.get("manifest", []))
         self.rebuild_background(
             table=data.get("table"),
             table_texture_id=data.get("table_texture"),
             wall_texture_id=data.get("wall_texture"),
             random_background=False,
         )
-        for i, item in enumerate(data.get("items", [])):
-            obj = spawn(self.scene, LIBRARY[item["asset_id"]], f"{item['asset_id']}#{i}")
+        for item in data.get("items", []):
+            self._counter += 1
+            obj = spawn(self.scene, LIBRARY[item["asset_id"]], f"{item['asset_id']}#{self._counter}")
             self.objects[obj.id] = obj
+            self.slot_of[obj.id] = item.get("slot")
             obj.set_pose(sapien.Pose(np.asarray(item["transform"], dtype=float)))
         self.scene.update_render()
 
     # -- editing ---------------------------------------------------------- #
-    def place(self, asset_id: str, x: int, y: int) -> str | None:
+    def place(self, asset_id: str, x: int, y: int, slot: str | None = None) -> str | None:
         point = self._world_point(x, y)
         if point is None:
             return None
-        obj = spawn(self.scene, LIBRARY[asset_id], f"{asset_id}#{len(self.objects)}")
+        self._counter += 1
+        obj = spawn(self.scene, LIBRARY[asset_id], f"{asset_id}#{self._counter}")
         self.objects[obj.id] = obj
+        self.slot_of[obj.id] = slot
         obj.set_pose(sapien.Pose([point[0], point[1], point[2]], [1, 0, 0, 0]))
         self.scene.update_render()
         pose = obj.get_pose()  # rest the bottom on the clicked surface
         obj.set_pose(sapien.Pose([pose.p[0], pose.p[1], pose.p[2] + point[2] - _world_aabb_min_z(obj.entity)], pose.q))
         self.selected = obj.id
         return obj.id
+
+    def place_slot(self, slot: str, x: int, y: int) -> str | None:
+        """Place the asset a manifest slot points at. No-op if the slot is
+        already satisfied or unknown."""
+        if slot in self.slot_of.values():
+            return None
+        entry = next((m for m in self.manifest if m["slot"] == slot), None)
+        if entry is None:
+            return None
+        return self.place(entry["asset_id"], x, y, slot=slot)
 
     def select(self, scene_id: str) -> None:
         self.selected = scene_id if scene_id in self.objects else None
@@ -150,6 +189,7 @@ class SceneEditor:
 
     def delete(self, scene_id: str) -> None:
         self.scene.remove_entity(self.objects.pop(scene_id).entity)
+        self.slot_of.pop(scene_id, None)
         if self.selected == scene_id:
             self.selected = None
 

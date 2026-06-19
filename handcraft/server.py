@@ -24,7 +24,8 @@ from scene import LIBRARY
 from robotwin_utils import curated_textures
 
 HERE = Path(__file__).resolve().parent
-SAVE_DIR = HERE.parent / "data" / "tidy_scene_v0"
+SAVE_DIR = HERE.parent / "data" / "tidy_scene_v0"          # legacy free-form scenes
+SCENARIOS_DIR = HERE.parent / "data" / "scenarios"          # <scenario>/<NNN>.json
 GPU = threading.Lock()  # all SAPIEN rendering is single-threaded
 
 editor = SceneEditor()
@@ -70,6 +71,44 @@ def _load_scene(name: str) -> None:
         editor.load_scene_dict(json.loads(path.read_text()))
 
 
+# -- scenarios: data/scenarios/<scenario>/<NNN>.json ----------------------- #
+def _scenario_scene_path(scenario: str, scene: str) -> Path:
+    path = (SCENARIOS_DIR / scenario / f"{Path(scene).stem}.json").resolve()
+    if path.parent.parent != SCENARIOS_DIR.resolve():  # scenario must be a direct subdir
+        raise ValueError(f"invalid scenario/scene: {scenario}/{scene}")
+    return path
+
+
+def _list_scenarios() -> list[str]:
+    if not SCENARIOS_DIR.is_dir():
+        return []
+    return sorted(p.name for p in SCENARIOS_DIR.iterdir() if p.is_dir())
+
+
+def _list_scenario_scenes(scenario: str) -> list[dict]:
+    out = []
+    for p in sorted((SCENARIOS_DIR / scenario).glob("*.json")):
+        data = json.loads(p.read_text())
+        out.append({"scene": p.stem,
+                    "placed": sum(1 for i in data.get("items", []) if i.get("slot")),
+                    "total": len(data.get("manifest", []))})
+    return out
+
+
+def _load_scenario_scene(scenario: str, scene: str) -> None:
+    path = _scenario_scene_path(scenario, scene)
+    if not path.is_file():
+        raise FileNotFoundError(f"{scenario}/{scene}")
+    with GPU:
+        editor.load_scene_dict(json.loads(path.read_text()))
+
+
+def _save_scenario_scene() -> str:
+    path = _scenario_scene_path(editor.scenario, editor.scene_id)
+    path.write_text(json.dumps(editor.scene_dict(), indent=2, ensure_ascii=False))
+    return f"{editor.scenario}/{path.name}"
+
+
 app = FastAPI(title="tidy handcraft")
 
 
@@ -86,6 +125,16 @@ def meta():
 @app.get("/scenes")
 def scenes():
     return {"dir": str(SAVE_DIR), "scenes": _list_scenes()}
+
+
+@app.get("/scenarios")
+def scenarios():
+    return {"scenarios": _list_scenarios()}
+
+
+@app.get("/scenario_scenes")
+def scenario_scenes(scenario: str):
+    return {"scenario": scenario, "scenes": _list_scenario_scenes(scenario)}
 
 
 @app.get("/textures")
@@ -127,7 +176,10 @@ async def ws(socket: WebSocket):
             msg = await socket.receive_json()
             kind = msg["type"]
             if kind == "place":
-                editor.place(msg["asset_id"], msg["x"], msg["y"])
+                if msg.get("slot"):  # manifest card -> place that slot's asset
+                    editor.place_slot(msg["slot"], msg["x"], msg["y"])
+                else:                # full-library browser -> an extra (no slot)
+                    editor.place(msg["asset_id"], msg["x"], msg["y"])
             elif kind == "select":
                 editor.select(msg["scene_id"])
             elif kind == "select_at":
@@ -139,7 +191,11 @@ async def ws(socket: WebSocket):
             elif kind == "clear":
                 editor.clear()
             elif kind == "save":
-                await socket.send_json({"type": "saved", "name": _save_scene(msg.get("name"))})
+                if editor.scenario and editor.scene_id:  # scenario mode -> write back in place
+                    name = _save_scenario_scene()
+                else:                                    # legacy free-form scene
+                    name = _save_scene(msg.get("name"))
+                await socket.send_json({"type": "saved", "name": name})
             elif kind == "randomize_bg":
                 with GPU:
                     editor.randomize_background()
@@ -150,6 +206,9 @@ async def ws(socket: WebSocket):
             elif kind == "load":
                 _load_scene(msg["name"])
                 await socket.send_json({"type": "loaded", "name": msg["name"]})
+            elif kind == "load_scene":
+                _load_scenario_scene(msg["scenario"], msg["scene"])
+                await socket.send_json({"type": "loaded", "name": f'{msg["scenario"]}/{msg["scene"]}'})
             await socket.send_json(_frame())
     except WebSocketDisconnect:
         return

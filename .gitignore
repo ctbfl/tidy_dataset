@@ -1,4 +1,6 @@
 data/*
+# Keep hand-annotated scene data under version control (rest of data/ stays ignored).
+!data/scenarios/
 tmp/*
 __pycache__/
 *.pyc

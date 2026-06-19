@@ -15,24 +15,10 @@
   #actions { position: absolute; right: 12px; bottom: 10px; display: flex; gap: 8px; }
   #actions button { color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font: inherit; }
   #save { background: #2f6b4e; } #save:hover { background: #3a8762; }
-  #load { background: #2f4f6b; } #load:hover { background: #3a6587; }
   #clear { background: #6b3a2f; } #clear:hover { background: #87493a; }
 
-  /* load dialog */
-  #loadModal { position: absolute; inset: 0; background: rgba(8,9,12,0.6); display: none;
-               align-items: center; justify-content: center; z-index: 10; }
-  #loadModal.open { display: flex; }
-  #loadCard { width: 380px; max-height: 70vh; background: #1b1d22; border-radius: 8px; padding: 14px;
-              display: flex; flex-direction: column; gap: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
-  #loadCard h3 { margin: 0; font-size: 14px; }
-  #loadDir { font-size: 11px; color: #8b94a3; word-break: break-all; }
-  #loadList { list-style: none; margin: 0; padding: 0; overflow: auto; }
-  #loadList li { padding: 8px 10px; border-radius: 4px; cursor: pointer; }
-  #loadList li:hover { background: #2b303b; }
-  #loadClose { align-self: flex-end; background: #3a3f4b; }
-
   /* floating, foldable object list */
-  #objects { position: absolute; left: 12px; top: 12px; width: 230px; background: rgba(29,31,37,0.94);
+  #objects { position: absolute; left: 12px; top: 12px; width: 240px; background: rgba(29,31,37,0.94);
              border-radius: 6px; overflow: hidden; font-size: 13px; }
   #objects h3 { margin: 0; padding: 8px 12px; font-size: 13px; cursor: pointer; background: #232732; }
   #objects.folded ul { display: none; }
@@ -41,61 +27,89 @@
   #objects li:hover { background: #2b303b; }
   #objects li.sel { background: #3a4a78; }
   #objects li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #objects li small { color: #8b94a3; }
   #objects li button { background: #6b3a2f; border: none; color: #fff; border-radius: 3px; cursor: pointer; padding: 1px 7px; }
 
-  /* asset browser */
-  #browser { width: 360px; background: #1b1d22; display: flex; flex-direction: column; padding: 10px; gap: 8px; }
+  /* right panel */
+  #browser { width: 380px; background: #1b1d22; display: flex; flex-direction: column; padding: 10px; gap: 10px; overflow: auto; }
+  #picker { display: flex; flex-direction: column; gap: 6px; }
+  #picker .row { display: flex; gap: 6px; align-items: center; }
+  #picker label { width: 64px; font-size: 12px; color: #8b94a3; }
+  #picker select { flex: 1; background: #2b2f38; color: #ddd; border: none; padding: 7px; border-radius: 4px; font: inherit; }
+  #progress { font-size: 12px; color: #6fb98f; }
+
+  /* manifest checklist */
+  #manifest { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; align-content: start; }
+  .mcard { position: relative; background: #0c0d10; border-radius: 5px; aspect-ratio: 1; cursor: grab;
+           border: 2px solid transparent; }
+  .mcard:hover { border-color: #3a4a78; }
+  .mcard.placed { cursor: default; opacity: 0.55; }
+  .mcard.placed:hover { border-color: transparent; }
+  .mcard img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .mrole { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; text-align: center;
+           color: #c7ccd6; background: rgba(12,13,16,0.7); padding: 1px 0; pointer-events: none;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .check { position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%;
+           background: #2fae5f; color: #fff; font-size: 12px; line-height: 18px; text-align: center;
+           box-shadow: 0 0 0 2px rgba(12,13,16,0.8); pointer-events: none; }
+
+  details { background: #161820; border-radius: 5px; padding: 4px 8px; }
+  details > summary { cursor: pointer; font-size: 12px; color: #aab2c0; padding: 4px 0; user-select: none; }
+  .bg-row { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+  .bg-row label { width: 48px; font-size: 12px; color: #8b94a3; }
+  .bg-row select { flex: 1; background: #2b2f38; color: #ddd; border: none; padding: 6px; border-radius: 4px; font: inherit; }
+  .bg-btns { display: flex; gap: 6px; margin-top: 6px; }
+  .bg-btns button { flex: 1; background: #34465f; color: #fff; border: none; padding: 7px; border-radius: 4px; cursor: pointer; font: inherit; }
   #filters input, #filters select { width: 100%; background: #2b2f38; color: #ddd; border: none;
-                                     padding: 7px; border-radius: 4px; font: inherit; margin-bottom: 6px; }
-  #grid { flex: 1; overflow: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; align-content: start; }
+                                     padding: 7px; border-radius: 4px; font: inherit; margin: 6px 0 0; }
+  #grid { margin-top: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; align-content: start;
+          max-height: 40vh; overflow: auto; }
   .cell { background: #0c0d10; border-radius: 5px; aspect-ratio: 1; cursor: grab; border: 2px solid transparent; }
   .cell:hover { border-color: #3a4a78; }
   .cell img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
-  #count { font-size: 12px; color: #8b94a3; }
+  #count { font-size: 12px; color: #8b94a3; margin-top: 6px; }
 </style>
 </head>
 <body>
   <div id="stage">
     <canvas id="scene" width="1024" height="768"></canvas>
     <div id="objects"><h3 id="objects-head">Objects (0)</h3><ul id="objects-list"></ul></div>
-    <div id="hint">drag an asset onto the table &middot; click to select &middot; WASD move &middot; Q/E yaw</div>
+    <div id="hint">drag a checklist item onto the table &middot; click to select &middot; WASD move &middot; Q/E yaw</div>
     <div id="actions">
       <button id="clear">Clear</button>
-      <button id="load">Load scene</button>
       <button id="save">Save scene</button>
-    </div>
-    <div id="loadModal">
-      <div id="loadCard">
-        <h3>Load scene</h3>
-        <div id="loadDir"></div>
-        <ul id="loadList"></ul>
-        <button id="loadClose">Close</button>
-      </div>
     </div>
   </div>
 
   <div id="browser">
-    <div id="bg">
-      <div class="bg-row">
-        <label>Table</label>
-        <select id="bgTable"><option value="">(plain)</option></select>
+    <div id="picker">
+      <div class="row"><label>Scenario</label><select id="scenario"></select></div>
+      <div class="row"><label>Scene</label><select id="sceneSel"></select></div>
+      <div id="progress"></div>
+    </div>
+
+    <div id="manifest"></div>
+
+    <details id="extra">
+      <summary>Add extra object (full library)</summary>
+      <div id="filters">
+        <input id="search" placeholder="search id..." />
+        <select id="tag"><option value="">all tags</option></select>
+        <select id="source"><option value="">all sources</option></select>
+        <div id="count"></div>
       </div>
-      <div class="bg-row">
-        <label>Wall</label>
-        <select id="bgWall"><option value="">(plain)</option></select>
-      </div>
+      <div id="grid"></div>
+    </details>
+
+    <details id="bgbox">
+      <summary>Background (table / wall texture)</summary>
+      <div class="bg-row"><label>Table</label><select id="bgTable"><option value="">(plain)</option></select></div>
+      <div class="bg-row"><label>Wall</label><select id="bgWall"><option value="">(plain)</option></select></div>
       <div class="bg-btns">
-        <button id="bgApply">Apply background</button>
+        <button id="bgApply">Apply</button>
         <button id="bgRandom">Randomize</button>
       </div>
-    </div>
-    <div id="filters">
-      <input id="search" placeholder="search id..." />
-      <select id="tag"><option value="">all tags</option></select>
-      <select id="source"><option value="">all sources</option></select>
-      <div id="count"></div>
-    </div>
-    <div id="grid"></div>
+    </details>
   </div>
 
 <script>
@@ -111,44 +125,32 @@ const hintEl = document.getElementById('hint');
 const HINT = hintEl.textContent;
 function flashHint(text) { hintEl.textContent = text; setTimeout(() => hintEl.textContent = HINT, 2000); }
 
-let selected = null;
+let selected = null;          // selected scene object id
+let currentScenario = null;   // truthy => scenario annotation mode (save writes back)
+let dragPayload = null;       // {slot} from a checklist card, or {asset_id} from the extra library
+
 ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
-  if (msg.type === 'saved') { flashHint('saved → ' + msg.name); return; }
+  if (msg.type === 'saved') { flashHint('saved → ' + msg.name); refreshSceneProgress(); return; }
   if (msg.type === 'loaded') { flashHint('loaded → ' + msg.name); return; }
   img.src = 'data:image/jpeg;base64,' + msg.image;
-  selected = msg.state.selected;
-  renderObjects(msg.state.objects);
-  if (msg.state.background) reflectBg(msg.state.background);
+  const st = msg.state;
+  selected = st.selected;
+  currentScenario = st.scenario || null;
+  renderManifest(st.manifest || []);
+  renderObjects(st.objects, st.slots || {});
+  if (st.background) reflectBg(st.background);
 };
+
 document.getElementById('save').addEventListener('click', () => {
+  if (currentScenario) { send({ type: 'save' }); return; }   // scenario mode: write back in place
   const name = prompt('Save scene as (blank = auto-numbered):', '');
-  if (name === null) return;  // cancelled
+  if (name === null) return;
   send({ type: 'save', name: name.trim() });
 });
 document.getElementById('clear').addEventListener('click', () => {
-  if (confirm('Clear all objects from the scene?')) send({ type: 'clear' });
+  if (confirm('Clear all placed objects from this scene?')) send({ type: 'clear' });
 });
-
-// load dialog: browse scene files on the server host and load one
-const loadModal = document.getElementById('loadModal');
-async function openLoad() {
-  const data = await (await fetch('/scenes')).json();
-  document.getElementById('loadDir').textContent = data.dir;
-  const ul = document.getElementById('loadList');
-  ul.innerHTML = '';
-  if (!data.scenes.length) ul.innerHTML = '<li style="color:#8b94a3;cursor:default">(no saved scenes)</li>';
-  for (const name of data.scenes) {
-    const li = document.createElement('li');
-    li.textContent = name;
-    li.addEventListener('click', () => { send({ type: 'load', name }); loadModal.classList.remove('open'); });
-    ul.appendChild(li);
-  }
-  loadModal.classList.add('open');
-}
-document.getElementById('load').addEventListener('click', openLoad);
-document.getElementById('loadClose').addEventListener('click', () => loadModal.classList.remove('open'));
-loadModal.addEventListener('click', (ev) => { if (ev.target === loadModal) loadModal.classList.remove('open'); });
 
 // pixel mapping from a mouse event to image coordinates
 function toImage(ev) {
@@ -162,7 +164,9 @@ canvas.addEventListener('dragover', (ev) => ev.preventDefault());
 canvas.addEventListener('drop', (ev) => {
   ev.preventDefault();
   const p = toImage(ev);
-  send({ type: 'place', asset_id: ev.dataTransfer.getData('text/plain'), x: p.x, y: p.y });
+  if (dragPayload && dragPayload.slot) send({ type: 'place', slot: dragPayload.slot, x: p.x, y: p.y });
+  else if (dragPayload && dragPayload.asset_id) send({ type: 'place', asset_id: dragPayload.asset_id, x: p.x, y: p.y });
+  dragPayload = null;
 });
 
 document.addEventListener('keydown', (ev) => {
@@ -170,10 +174,10 @@ document.addEventListener('keydown', (ev) => {
   if ('wasdqe'.includes(ev.key)) { send({ type: 'key', name: ev.key }); ev.preventDefault(); }
 });
 
-// floating object list
+// floating object list (label with slot, or "extra")
 const objectsBox = document.getElementById('objects');
 document.getElementById('objects-head').addEventListener('click', () => objectsBox.classList.toggle('folded'));
-function renderObjects(ids) {
+function renderObjects(ids, slots) {
   document.getElementById('objects-head').textContent = `Objects (${ids.length})`;
   const ul = document.getElementById('objects-list');
   ul.innerHTML = '';
@@ -181,8 +185,9 @@ function renderObjects(ids) {
     const li = document.createElement('li');
     if (id === selected) li.className = 'sel';
     const label = document.createElement('span');
-    label.textContent = id; li.title = id;
+    label.textContent = slots[id] || id; li.title = id;
     li.appendChild(label);
+    if (!slots[id]) { const tag = document.createElement('small'); tag.textContent = 'extra'; li.appendChild(tag); }
     li.addEventListener('click', () => send({ type: 'select', scene_id: id }));
     const del = document.createElement('button');
     del.textContent = '×';
@@ -192,7 +197,61 @@ function renderObjects(ids) {
   }
 }
 
-// asset browser
+// checklist (manifest) cards: thumbnail + role label + a green check when placed
+function renderManifest(manifest) {
+  const box = document.getElementById('manifest');
+  box.innerHTML = '';
+  let placed = 0;
+  for (const m of manifest) {
+    if (m.placed) placed++;
+    const card = document.createElement('div');
+    card.className = 'mcard' + (m.placed ? ' placed' : '');
+    card.draggable = !m.placed;            // a slot is one-shot; delete to re-place
+    card.title = `${m.slot}\n${m.asset_id}`;
+    card.addEventListener('dragstart', () => { dragPayload = { slot: m.slot }; });
+    const im = document.createElement('img');
+    im.loading = 'lazy'; im.src = '/preview?asset_id=' + encodeURIComponent(m.asset_id);
+    card.appendChild(im);
+    const role = document.createElement('div'); role.className = 'mrole'; role.textContent = m.slot;
+    card.appendChild(role);
+    if (m.placed) { const c = document.createElement('div'); c.className = 'check'; c.textContent = '✓'; card.appendChild(c); }
+    box.appendChild(card);
+  }
+  document.getElementById('progress').textContent =
+    manifest.length ? `${placed} / ${manifest.length} placed` : '(no checklist — load a scenario)';
+  const opt = [...sceneSel.options].find((o) => o.value === sceneSel.value);
+  if (opt && manifest.length) opt.text = `${sceneSel.value} — ${placed}/${manifest.length}`;
+}
+
+// scenario / scene pickers
+const scenarioSel = document.getElementById('scenario');
+const sceneSel = document.getElementById('sceneSel');
+async function loadScenarios() {
+  const { scenarios } = await (await fetch('/scenarios')).json();
+  scenarioSel.innerHTML = '';
+  for (const s of scenarios) scenarioSel.add(new Option(s, s));
+  if (scenarios.length) await loadScenes();
+}
+async function loadScenes() {
+  const scenario = scenarioSel.value;
+  const { scenes } = await (await fetch('/scenario_scenes?scenario=' + encodeURIComponent(scenario))).json();
+  sceneSel.innerHTML = '';
+  for (const s of scenes) sceneSel.add(new Option(`${s.scene} — ${s.placed}/${s.total}`, s.scene));
+  if (scenes.length) loadSceneNow();
+}
+function loadSceneNow() { send({ type: 'load_scene', scenario: scenarioSel.value, scene: sceneSel.value }); }
+async function refreshSceneProgress() {
+  if (!scenarioSel.value) return;
+  const keep = sceneSel.value;
+  const { scenes } = await (await fetch('/scenario_scenes?scenario=' + encodeURIComponent(scenarioSel.value))).json();
+  sceneSel.innerHTML = '';
+  for (const s of scenes) sceneSel.add(new Option(`${s.scene} — ${s.placed}/${s.total}`, s.scene));
+  sceneSel.value = keep;
+}
+scenarioSel.addEventListener('change', loadScenes);
+sceneSel.addEventListener('change', loadSceneNow);
+
+// extra-object browser (full library)
 async function loadMeta() {
   const m = await (await fetch('/meta')).json();
   const tag = document.getElementById('tag'), source = document.getElementById('source');
@@ -212,7 +271,7 @@ async function loadAssets() {
   for (const a of list) {
     const cell = document.createElement('div');
     cell.className = 'cell'; cell.draggable = true; cell.title = a.id;
-    cell.addEventListener('dragstart', (ev) => ev.dataTransfer.setData('text/plain', a.id));
+    cell.addEventListener('dragstart', () => { dragPayload = { asset_id: a.id }; });
     const im = document.createElement('img');
     im.loading = 'lazy'; im.src = '/preview?asset_id=' + encodeURIComponent(a.id);
     cell.appendChild(im);
@@ -244,9 +303,10 @@ document.getElementById('bgApply').addEventListener('click', () => {
 });
 document.getElementById('bgRandom').addEventListener('click', () => send({ type: 'randomize_bg' }));
 
+// init: HTTP fetches now; ws-dependent loads once the socket opens
 loadMeta();
-loadTextures();
 loadAssets();
+ws.addEventListener('open', () => { loadTextures(); loadScenarios(); });
 </script>
 </body>
 </html>

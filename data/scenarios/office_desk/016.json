@@ -1,0 +1,263 @@
+{
+  "version": 2,
+  "scenario": "office_desk",
+  "scene_id": "016",
+  "template": "office_desk",
+  "table": {
+    "length": 1.2,
+    "width": 0.7,
+    "height": 0.74,
+    "thickness": 0.05
+  },
+  "table_texture": null,
+  "wall_texture": null,
+  "manifest": [
+    {
+      "slot": "display-1",
+      "role": "display",
+      "asset_id": "robotwin:glb:097_screen:0"
+    },
+    {
+      "slot": "keyboard-1",
+      "role": "keyboard",
+      "asset_id": "robotwin:glb:116_keyboard:0"
+    },
+    {
+      "slot": "mouse-1",
+      "role": "mouse",
+      "asset_id": "robotwin:glb:047_mouse:2"
+    },
+    {
+      "slot": "pen-1",
+      "role": "pen",
+      "asset_id": "robotwin:glb:058_markpen:2"
+    },
+    {
+      "slot": "plant-1",
+      "role": "plant",
+      "asset_id": "robotwin:glb:120_plant:0"
+    },
+    {
+      "slot": "phone-1",
+      "role": "phone",
+      "asset_id": "robotwin:glb:077_phone:0"
+    },
+    {
+      "slot": "calculator-1",
+      "role": "calculator",
+      "asset_id": "robotwin:glb:017_calculator:5"
+    }
+  ],
+  "items": [
+    {
+      "slot": "display-1",
+      "asset_id": "robotwin:glb:097_screen:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.024669822305440903
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.16454102098941803
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7399998903274536
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "keyboard-1",
+      "asset_id": "robotwin:glb:116_keyboard:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.02796286717057228
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.11142010241746902
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "mouse-1",
+      "asset_id": "robotwin:glb:047_mouse:2",
+      "transform": [
+        [
+          -1.0,
+          -2.3841803908908332e-07,
+          0.0,
+          0.34447503089904785
+        ],
+        [
+          2.3841803908908332e-07,
+          -1.0,
+          0.0,
+          -0.1119164526462555
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "pen-1",
+      "asset_id": "robotwin:glb:058_markpen:2",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.3433876633644104
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.11400733888149261
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7494896054267883
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "calculator-1",
+      "asset_id": "robotwin:glb:017_calculator:5",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.4335816204547882
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.1978236436843872
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000691413879
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "phone-1",
+      "asset_id": "robotwin:glb:077_phone:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.267577201128006
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.1951696127653122
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7399999499320984
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "plant-1",
+      "asset_id": "robotwin:glb:120_plant:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.4810190200805664
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.14689841866493225
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000691413879
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  ]
+}

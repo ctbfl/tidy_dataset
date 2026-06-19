@@ -1,0 +1,228 @@
+{
+  "version": 2,
+  "scenario": "office_desk",
+  "scene_id": "003",
+  "template": "office_desk",
+  "table": {
+    "length": 1.2,
+    "width": 0.7,
+    "height": 0.74,
+    "thickness": 0.05
+  },
+  "table_texture": null,
+  "wall_texture": null,
+  "manifest": [
+    {
+      "slot": "display-1",
+      "role": "display",
+      "asset_id": "robotwin:glb:097_screen:2"
+    },
+    {
+      "slot": "keyboard-1",
+      "role": "keyboard",
+      "asset_id": "robotwin:glb:116_keyboard:1"
+    },
+    {
+      "slot": "mouse-1",
+      "role": "mouse",
+      "asset_id": "robotwin:glb:047_mouse:1"
+    },
+    {
+      "slot": "book-1",
+      "role": "book",
+      "asset_id": "robotwin:glb:092_notebook:1"
+    },
+    {
+      "slot": "plant-1",
+      "role": "plant",
+      "asset_id": "robotwin:glb:120_plant:0"
+    },
+    {
+      "slot": "phone-1",
+      "role": "phone",
+      "asset_id": "robotwin:glb:077_phone:4"
+    }
+  ],
+  "items": [
+    {
+      "slot": "display-1",
+      "asset_id": "robotwin:glb:097_screen:2",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.020990919321775436
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.1978236436843872
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "keyboard-1",
+      "asset_id": "robotwin:glb:116_keyboard:1",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          -0.022250978276133537
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.06822872161865234
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7379899621009827
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "mouse-1",
+      "asset_id": "robotwin:glb:047_mouse:1",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.307814359664917
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.07217966020107269
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "book-1",
+      "asset_id": "robotwin:glb:092_notebook:1",
+      "transform": [
+        [
+          -4.76837158203125e-07,
+          1.0,
+          0.0,
+          -0.4454978406429291
+        ],
+        [
+          -1.0,
+          -4.76837158203125e-07,
+          0.0,
+          0.18085066974163055
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "phone-1",
+      "asset_id": "robotwin:glb:077_phone:4",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.21020746231079102
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.17916089296340942
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "plant-1",
+      "asset_id": "robotwin:glb:120_plant:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.46910524368286133
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.15796221792697906
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7400000095367432
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "version": 2,
+  "scenario": "office_desk",
+  "scene_id": "019",
+  "template": "office_desk",
+  "table": {
+    "length": 1.2,
+    "width": 0.7,
+    "height": 0.74,
+    "thickness": 0.05
+  },
+  "table_texture": null,
+  "wall_texture": null,
+  "manifest": [
+    {
+      "slot": "laptop-1",
+      "role": "laptop",
+      "asset_id": "robotwin:glb:015_laptop:0"
+    },
+    {
+      "slot": "plant-1",
+      "role": "plant",
+      "asset_id": "robotwin:glb:012_plant-pot:3"
+    }
+  ],
+  "items": [
+    {
+      "slot": "laptop-1",
+      "asset_id": "robotwin:glb:015_laptop:0",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.030141858384013176
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          -0.002176329493522644
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7885542511940002
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    {
+      "slot": "plant-1",
+      "asset_id": "robotwin:glb:012_plant-pot:3",
+      "transform": [
+        [
+          1.0,
+          0.0,
+          0.0,
+          0.4193648099899292
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.1829925924539566
+        ],
+        [
+          0.0,
+          0.0,
+          1.0,
+          0.7399998903274536
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  ]
+}
