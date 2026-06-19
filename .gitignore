@@ -1,6 +1,9 @@
 data/*
 # Keep hand-annotated scene data under version control (rest of data/ stays ignored).
 !data/scenarios/
+# 'dining' scenario is work-in-progress; keep all of it (data + template) out of the repo for now.
+data/scenarios/dining/
+templates/dining.json
 tmp/*
 __pycache__/
 *.pyc
