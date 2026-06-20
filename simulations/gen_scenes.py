@@ -19,7 +19,7 @@ import json
 import random
 from pathlib import Path
 
-from objects import AssetLibrary
+from objects import AssetLibrary, write_asset_json_backup
 from templates import load_template, sample_manifest
 
 REPO = Path(__file__).resolve().parents[1]
@@ -72,6 +72,7 @@ def main() -> None:
         scene = build_scene(template, manifest, scenario, scene_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(scene, indent=2, ensure_ascii=False))
+        write_asset_json_backup(path, scene, library)
         roles = ", ".join(m["slot"] for m in manifest)
         print(f"[write] {path.relative_to(REPO)}  {len(manifest)} items: {roles}")
 

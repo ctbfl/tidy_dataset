@@ -1,0 +1,140 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:093_brush-pen:0",
+  "label": "093_brush-pen · 0",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "093_brush-pen",
+    "model_id": "0",
+    "source_asset_id": "093_brush-pen:0",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/093_brush-pen/visual/base0.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/093_brush-pen/model_data0.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "pen"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/093_brush-pen/visual/base0.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/093_brush-pen/collision/base0.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.10619155661837916,
+      0.10619155661837916,
+      0.10619155661837916
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.0069865147313896885,
+        -0.10070585257642858,
+        -0.0016701998492769413
+      ],
+      "max": [
+        0.006993735911217495,
+        0.1011203531974267,
+        0.011996529196928406
+      ],
+      "aabb_center": [
+        3.6105899139034398e-06,
+        0.00020725031116274753,
+        0.005163164673162035
+      ],
+      "size": [
+        0.013980250643934577,
+        0.20182620577385527,
+        0.013666729046205348
+      ],
+      "bottom_z": -0.0016701998492769413
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {
+    "lower_points_local": {
+      "base": "asset_dir",
+      "path": "contacts/lower_500.npy"
+    },
+    "quality": {
+      "lower_points_local_count": 500,
+      "lower_generation": {
+        "method": "pybullet_stable_drop_surface_patch_v1",
+        "frame": "asset_metric_local",
+        "target_points": 500,
+        "surface_samples": 120000,
+        "drop_height_m": 0.003,
+        "floor_z": 0.0,
+        "yaw_rad": 0.0,
+        "surface_eps_m": 0.002,
+        "selection_mode": "surface_eps",
+        "settled": true,
+        "final_tilt_deg": 0.0,
+        "contact_count": 4,
+        "total_normal_force": 0.2934625174324905,
+        "final_linear_vel": 3.132045844635861e-05,
+        "final_angular_vel": 0.0,
+        "stable_rotation_used": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ]
+        ]
+      }
+    }
+  }
+}

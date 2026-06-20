@@ -1,0 +1,134 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:urdf:marker:004",
+  "label": "marker · 004",
+  "source": "robotwin",
+  "model_type": "urdf",
+  "source_specific_terms": {
+    "model_name": "marker",
+    "model_id": "004",
+    "source_asset_id": "objaverse/marker/004",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/objaverse/marker/004/model.urdf"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "pen",
+      "objaverse"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/objaverse/marker/004/model.urdf"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/objaverse/marker/004/model.urdf"
+    },
+    "pybullet_collision_mesh": "",
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "stable_rotation": [
+      [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "urdf_collision",
+      "source_mesh": "/home/hjs/Projects/table_arrangement/organize_it_v2/RoboTwin/assets/objects/objaverse/marker/004/coacd_collision.obj",
+      "min": [
+        -0.009388770103,
+        -0.073876106262,
+        -0.009006272316
+      ],
+      "max": [
+        0.009143501282,
+        0.073731521606,
+        0.009018427849
+      ],
+      "aabb_center": [
+        -0.000122634411,
+        -7.2292328e-05,
+        6.077766e-06
+      ],
+      "size": [
+        0.018532271385,
+        0.147607627869,
+        0.018024700165
+      ],
+      "bottom_z": -0.009006272316
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {
+    "lower_points_local": {
+      "base": "asset_dir",
+      "path": "contacts/lower_500.npy"
+    },
+    "quality": {
+      "lower_points_local_count": 500,
+      "lower_generation": {
+        "method": "pybullet_stable_drop_surface_patch_v1",
+        "frame": "asset_metric_local",
+        "target_points": 500,
+        "surface_samples": 120000,
+        "drop_height_m": 0.003,
+        "floor_z": 0.0,
+        "yaw_rad": 0.0,
+        "surface_eps_m": 0.002,
+        "selection_mode": "surface_eps",
+        "settled": true,
+        "final_tilt_deg": 0.4096603057581708,
+        "contact_count": 2,
+        "total_normal_force": 0.9810000000165595,
+        "final_linear_vel": 2.999775853463471e-08,
+        "final_angular_vel": 3.084020565588969e-06,
+        "stable_rotation_used": [
+          [
+            0.0,
+            -1.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      }
+    }
+  }
+}

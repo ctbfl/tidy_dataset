@@ -194,6 +194,12 @@ def main() -> None:
     camera_info = calibration["camera"]
     asset_registry = mod.AssetRegistry.load(args.asset_catalog.expanduser().resolve())
 
+    if str(SIM_DIR) not in sys.path:
+        sys.path.insert(0, str(SIM_DIR))
+    import scene as tidy_scene  # simulations/scene.py
+    from objects import asset_json_backup_dir  # noqa: E402
+
+    tidy_scene.LIBRARY.load_asset_json_backup(asset_json_backup_dir(v0_path))
     ts = build_scene_with_tidy_loader(v0, v0.get("table_texture"))
     camera, T_world_from_sapien_cam = add_calibrated_camera(mod, ts, camera_info, args.near_m, args.far_m, args.camera_name)
     # Contract frame is table-centered (table top z=0): shift the SAPIEN-world camera pose

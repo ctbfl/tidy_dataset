@@ -1,0 +1,96 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:015_laptop:7",
+  "label": "015_laptop · 7",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "015_laptop",
+    "model_id": "7",
+    "source_asset_id": "015_laptop:7",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/015_laptop/visual/base7.glb"
+    },
+    "metadata_path": ""
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "laptop",
+      "office"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/015_laptop/visual/base7.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/015_laptop/visual/base7.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.24279380506869577,
+      0.24279380506869577,
+      0.24279380506869577
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.170975158643,
+        -0.175003353693,
+        -0.059675074879
+      ],
+      "max": [
+        0.159024841357,
+        0.060739485598,
+        0.151068247677
+      ],
+      "aabb_center": [
+        -0.005975158643,
+        -0.057131934047,
+        0.045696586399
+      ],
+      "size": [
+        0.33,
+        0.235742839291,
+        0.210743322556
+      ],
+      "bottom_z": -0.059675074879
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

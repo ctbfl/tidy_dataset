@@ -1,0 +1,143 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "gso:obj:ACE_Coffee_Mug_Kristen_16_oz_cup",
+  "label": "ACE_Coffee_Mug_Kristen_16_oz_cup",
+  "source": "gso",
+  "model_type": "obj",
+  "source_specific_terms": {
+    "model_name": "ACE_Coffee_Mug_Kristen_16_oz_cup",
+    "model_id": "ACE_Coffee_Mug_Kristen_16_oz_cup",
+    "source_asset_id": "ACE_Coffee_Mug_Kristen_16_oz_cup",
+    "source_path": {
+      "base": "source_root",
+      "path": "models/ACE_Coffee_Mug_Kristen_16_oz_cup/meshes/model.obj"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "metadata/recommend_by_scene.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Kitchen",
+      "cup",
+      "Desk",
+      "Consumer Goods",
+      "recommended"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "asset_dir",
+      "path": "source/model.obj"
+    },
+    "collision_mesh": {
+      "base": "asset_dir",
+      "path": "source/model.obj"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "source/model.obj"
+    },
+    "scale": [
+      0.7,
+      0.7,
+      0.7
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "source/model.obj",
+      "min": [
+        -0.044148300588,
+        -0.0325178008526,
+        -1.96e-05
+      ],
+      "max": [
+        0.0442771002653,
+        0.030918999761299998,
+        0.0944356039165
+      ],
+      "aabb_center": [
+        6.439983829999999e-05,
+        -0.0007994005459999999,
+        0.0472080019579
+      ],
+      "size": [
+        0.0884254008533,
+        0.06343680061389999,
+        0.0944552039172
+      ],
+      "bottom_z": -1.96e-05
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {
+    "lower_points_local": {
+      "base": "asset_dir",
+      "path": "contacts/lower_500.npy"
+    },
+    "quality": {
+      "lower_points_local_count": 500,
+      "lower_generation": {
+        "method": "pybullet_stable_drop_surface_patch_v1",
+        "frame": "asset_metric_local",
+        "target_points": 500,
+        "surface_samples": 120000,
+        "drop_height_m": 0.003,
+        "floor_z": 0.0,
+        "yaw_rad": 0.0,
+        "surface_eps_m": 0.002,
+        "selection_mode": "surface_eps",
+        "settled": true,
+        "final_tilt_deg": 0.0,
+        "contact_count": 4,
+        "total_normal_force": 0.2943000000000001,
+        "final_linear_vel": 1.3877787807814457e-17,
+        "final_angular_vel": 0.0,
+        "stable_rotation_used": [
+          [
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      }
+    }
+  }
+}

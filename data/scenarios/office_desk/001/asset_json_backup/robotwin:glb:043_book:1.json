@@ -1,0 +1,99 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:043_book:1",
+  "label": "043_book · 1",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "043_book",
+    "model_id": "1",
+    "source_asset_id": "043_book:1",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/043_book/visual/base1.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/043_book/model_data1.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "book",
+      "office"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/043_book/visual/base1.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/043_book/collision/base1.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.1,
+      0.1,
+      0.1
+    ],
+    "stable_rotation": [
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.103314471245,
+        -0.151979970932,
+        -0.002695241012
+      ],
+      "max": [
+        0.101945137978,
+        0.151924598217,
+        0.032132515311
+      ],
+      "aabb_center": [
+        -0.000684666634,
+        -2.7686357e-05,
+        0.01471863715
+      ],
+      "size": [
+        0.205259609222,
+        0.303904569149,
+        0.034827756323
+      ],
+      "bottom_z": -0.002695241012
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

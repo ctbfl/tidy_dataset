@@ -1,0 +1,99 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:092_notebook:1",
+  "label": "092_notebook · 1",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "092_notebook",
+    "model_id": "1",
+    "source_asset_id": "092_notebook:1",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/092_notebook/visual/base1.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/092_notebook/model_data1.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "notebook",
+      "office"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/092_notebook/visual/base1.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/092_notebook/collision/base1.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.1,
+      0.1,
+      0.1
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.096099805832,
+        -0.064729952812,
+        -0.001605924033
+      ],
+      "max": [
+        0.096087604761,
+        0.064177656174,
+        0.020263229311
+      ],
+      "aabb_center": [
+        -6.100535e-06,
+        -0.000276148319,
+        0.009328652639
+      ],
+      "size": [
+        0.192187410593,
+        0.128907608986,
+        0.021869153343
+      ],
+      "bottom_z": -0.001605924033
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

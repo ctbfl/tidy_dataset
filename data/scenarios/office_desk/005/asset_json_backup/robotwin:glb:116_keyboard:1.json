@@ -1,0 +1,99 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:116_keyboard:1",
+  "label": "116_keyboard · 1",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "116_keyboard",
+    "model_id": "1",
+    "source_asset_id": "116_keyboard:1",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/116_keyboard/visual/base1.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/116_keyboard/model_data1.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "keyboard",
+      "office"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/116_keyboard/visual/base1.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/116_keyboard/collision/base1.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.20897290835193652,
+      0.20897290835193652,
+      0.20897290835193652
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.20135730968205845,
+        -0.07341128612928147,
+        -0.0011858209557377149
+      ],
+      "max": [
+        0.20164296998983405,
+        0.07202009651759213,
+        0.036153631985970436
+      ],
+      "aabb_center": [
+        0.0001428301538878018,
+        -0.0006955948058446677,
+        0.01748390551511636
+      ],
+      "size": [
+        0.40300027967189256,
+        0.14543138264426145,
+        0.03733945294170815
+      ],
+      "bottom_z": -0.0011858209557377149
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

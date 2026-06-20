@@ -1,0 +1,96 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "objaverse:obj:coffee_cup:7",
+  "label": "coffee cup 7",
+  "source": "objaverse",
+  "model_type": "obj",
+  "source_specific_terms": {
+    "model_name": "coffee_cup",
+    "model_id": "7",
+    "source_asset_id": "coffee_cup_7"
+  },
+  "semantics": {
+    "tags": [
+      "Kitchen",
+      "Desk",
+      "cup"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "asset_dir",
+      "path": "source/model.obj"
+    },
+    "collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.859207461810885,
+      0.859207461810885,
+      0.859207461810885
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.028051338740616494,
+        -0.02805116589728823,
+        -0.054281667122384726
+      ],
+      "max": [
+        0.028051338740616494,
+        0.028048669275827054,
+        0.054279157697873164
+      ],
+      "aabb_center": [
+        0.0,
+        -1.2483107305889477e-06,
+        -1.2547126853869007e-06
+      ],
+      "size": [
+        0.05610267748123299,
+        0.05609983517311528,
+        0.10856082482025789
+      ],
+      "bottom_z": -0.054281667122384726
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {
+    "lower_points_local": {
+      "base": "asset_dir",
+      "path": "contacts/lower_500.npy"
+    }
+  }
+}

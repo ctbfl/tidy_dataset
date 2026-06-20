@@ -74,7 +74,7 @@
   <div id="stage">
     <canvas id="scene" width="1024" height="768"></canvas>
     <div id="objects"><h3 id="objects-head">Objects (0)</h3><ul id="objects-list"></ul></div>
-    <div id="hint">drag a checklist item onto the table &middot; click to select &middot; WASD move &middot; Q/E yaw</div>
+    <div id="hint">drag onto table &middot; click to select &middot; WASD move &middot; Q/E yaw &middot; hold Shift = fine &middot; height auto-rests</div>
     <div id="actions">
       <button id="clear">Clear</button>
       <button id="save">Save scene</button>
@@ -172,7 +172,8 @@ canvas.addEventListener('drop', (ev) => {
 
 document.addEventListener('keydown', (ev) => {
   if (ev.target.tagName === 'INPUT') return;
-  if ('wasdqe'.includes(ev.key)) { send({ type: 'key', name: ev.key }); ev.preventDefault(); }
+  const k = ev.key.toLowerCase();   // Shift uppercases the key — fold it back, use Shift only as the "fine" modifier
+  if ('wasdqe'.includes(k)) { send({ type: 'key', name: k, fine: ev.shiftKey }); ev.preventDefault(); }
 });
 
 // floating object list (label with slot, or "extra")

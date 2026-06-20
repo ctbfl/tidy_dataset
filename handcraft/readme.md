@@ -12,7 +12,9 @@
   `simulations/gen_scenes.py` 生成 scene 的 `tidy.json`，见 `templates/readme.md`。
 - **额外物体**：展开右侧「Add extra object」从全资产库补放（记为无 slot 的 extra）。
 - **背景**：可选桌面/墙体纹理或随机化。
-- **操作**：拖资产落桌 · 点击选中 · WASD 平移 · Q/E 偏航 · Clear 清空已摆物体（保留清单）。
+- **操作**：拖资产落桌 · 点击选中 · WASD 平移（按住 **Shift** 微调 2mm/5°）· Q/E 偏航 ·
+  Clear 清空已摆物体（保留清单）。摆放/移动时**高度（z）自动贴合**：物体沿 z 轴下落到正下方的支撑面
+  （桌面，或脚下的另一物体），x/y 与朝向锁定不变——盘子落桌、碗坐进盘子、水果嵌进碗里都自动成形。
 
 文件：`server.py`（HTTP/WS 路由）· `editor.py`（场景编辑 + slot 记账 + v1/v2 读写）·
 `preview.py`（缩略图缓存）· `index.html`（前端）。

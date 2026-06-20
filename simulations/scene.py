@@ -13,7 +13,7 @@ from sapien.render import set_global_config
 OUR_OTHER_ASSETS_ROOT = Path("/home/hjs/Projects/table_arrangement/tidy_dataset/assets")
 
 from robotwin_migration import TidyScene # Base_Task class from RoboTwin, include lots of scene initialization functions.
-from objects import AssetLibrary, spawn
+from objects import AssetLibrary, asset_json_backup_dir, spawn
 
 LIBRARY = AssetLibrary()
 
@@ -110,7 +110,9 @@ TIDY_SCENE_DIR = Path(__file__).resolve().parents[1] / "data" / "tidy_scene_v0"
 
 
 def open_scene(json_path=TIDY_SCENE_DIR / "0001.json", headless=False, use_hdri=False, random_background=True) -> TidyScene:
-    data = json.loads(Path(json_path).read_text())
+    json_path = Path(json_path)
+    data = json.loads(json_path.read_text())
+    LIBRARY.load_asset_json_backup(asset_json_backup_dir(json_path))
     table = data["table"]
     tidy_scene = create_scene(
         headless=headless, use_hdri=use_hdri,

@@ -32,7 +32,7 @@ import sapien.core as sapien
 from sapien import render
 
 from scene import LIBRARY, add_camera, create_scene
-from objects import spawn
+from objects import asset_json_backup_dir, spawn, write_asset_json_backup
 
 REPO = Path(__file__).resolve().parents[1]
 SCENARIOS_DIR = REPO / "data" / "scenarios"
@@ -246,6 +246,7 @@ def main() -> None:
         if out_path.exists() and not args.overwrite:
             print(f"[skip]  {d.name}: messy.json exists (use --overwrite)")
             continue
+        LIBRARY.load_asset_json_backup(asset_json_backup_dir(tidy_path))
         tidy = json.loads(tidy_path.read_text())
         rng = random.Random(args.seed + idx)
         items, attempts, status = generate(ts, cam, tidy, args, rng, cmask, [])
@@ -253,7 +254,9 @@ def main() -> None:
             print(f"[FAIL]  {d.name}: {status} ({attempts} attempts)")
             skipped += 1
             continue
-        out_path.write_text(json.dumps(messy_dict(tidy, items), indent=2, ensure_ascii=False))
+        messy = messy_dict(tidy, items)
+        out_path.write_text(json.dumps(messy, indent=2, ensure_ascii=False))
+        write_asset_json_backup(out_path, messy, LIBRARY)
         n_anchor = sum(1 for it in tidy.get("items", [])
                        if is_anchor(asset_aabb(it["asset_id"])[3], args.height_thresh, args.area_thresh))
         print(f"[write] {args.scenario}/{d.name}/messy.json  "

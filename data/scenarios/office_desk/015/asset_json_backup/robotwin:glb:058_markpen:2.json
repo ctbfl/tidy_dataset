@@ -1,0 +1,99 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:058_markpen:2",
+  "label": "058_markpen · 2",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "058_markpen",
+    "model_id": "2",
+    "source_asset_id": "058_markpen:2",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/058_markpen/visual/base2.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/058_markpen/model_data2.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Tools",
+      "pen",
+      "Desk"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/058_markpen/visual/base2.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/058_markpen/collision/base2.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.08109610578538408,
+      0.08109610578538408,
+      0.08109610578538408
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.010250358762200715,
+        -0.00037162291206017207,
+        -0.010792764462005347
+      ],
+      "max": [
+        0.01027598585500616,
+        0.15517047261096906,
+        0.01140179673790154
+      ],
+      "aabb_center": [
+        1.2813546402722488e-05,
+        0.07739942484945443,
+        0.00030451613754261674
+      ],
+      "size": [
+        0.020526344617206878,
+        0.15554209552302922,
+        0.022194561199906888
+      ],
+      "bottom_z": -0.010792764462005347
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

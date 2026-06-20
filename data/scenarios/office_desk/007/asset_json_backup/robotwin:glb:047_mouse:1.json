@@ -1,0 +1,139 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:047_mouse:1",
+  "label": "047_mouse · 1",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "047_mouse",
+    "model_id": "1",
+    "source_asset_id": "047_mouse:1",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/047_mouse/visual/base1.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/047_mouse/model_data1.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Desk"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/047_mouse/visual/base1.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/047_mouse/collision/base1.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "stable_rotation": [
+      [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.021959800273,
+        -0.038928050548,
+        -0.000682969985
+      ],
+      "max": [
+        0.021962700412,
+        0.038924548775,
+        0.030690925196
+      ],
+      "aabb_center": [
+        1.450069e-06,
+        -1.750886e-06,
+        0.015003977605
+      ],
+      "size": [
+        0.043922500685,
+        0.077852599323,
+        0.031373895181
+      ],
+      "bottom_z": -0.000682969985
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {
+    "lower_points_local": {
+      "base": "asset_dir",
+      "path": "contacts/lower_500.npy"
+    },
+    "quality": {
+      "lower_points_local_count": 500,
+      "lower_generation": {
+        "method": "pybullet_stable_drop_surface_patch_v1",
+        "frame": "asset_metric_local",
+        "target_points": 500,
+        "surface_samples": 120000,
+        "drop_height_m": 0.003,
+        "floor_z": 0.0,
+        "yaw_rad": 0.0,
+        "surface_eps_m": 0.002,
+        "selection_mode": "surface_eps",
+        "settled": true,
+        "final_tilt_deg": 0.0,
+        "contact_count": 4,
+        "total_normal_force": 0.2943000000000001,
+        "final_linear_vel": 1.3877787807814457e-17,
+        "final_angular_vel": 0.0,
+        "stable_rotation_used": [
+          [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0
+          ]
+        ]
+      }
+    }
+  }
+}

@@ -15,14 +15,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "simulations"))
 from scene import LIBRARY, add_camera, create_scene  # noqa: E402
 from objects import spawn  # noqa: E402
 
-TRANS_STEP = 0.02            # m per WASD press
-YAW_STEP = np.radians(15)    # rad per Q/E press
+TRANS_STEP = 0.01            # m per WASD press (coarse)
+TRANS_FINE = 0.002           # m per Shift+WASD press (fine — for centering a bowl on a plate)
+YAW_STEP = np.radians(15)    # rad per Q/E press (coarse)
+YAW_FINE = np.radians(5)     # rad per Shift+Q/E press (fine)
+SETTLE_STEPS = 400           # max physics sub-steps when dropping an object to rest
+SETTLE_REST_V = 1e-3         # m/s below which the falling object counts as settled
 OUTLINE_COLOR = (255, 220, 0)
 
 
-def _world_aabb_min_z(entity) -> float:
+def _world_aabb(entity) -> np.ndarray:
     body = entity.find_component_by_type(sapien.render.RenderBodyComponent)
-    return float(np.asarray(body.compute_global_aabb_tight())[0][2])
+    return np.asarray(body.compute_global_aabb_tight())  # [[min x,y,z], [max x,y,z]]
+
+
+def _world_aabb_min_z(entity) -> float:
+    return float(_world_aabb(entity)[0][2])
+
+
+def _dynamic(entity):
+    """The rigid-body component we toggle for the vertical settle (None for articulations)."""
+    return entity.find_component_by_type(sapien.physx.PhysxRigidDynamicComponent)
 
 
 class SceneEditor:
@@ -155,7 +168,45 @@ class SceneEditor:
             obj = spawn(self.scene, LIBRARY[item["asset_id"]], f"{item['asset_id']}#{self._counter}")
             self.objects[obj.id] = obj
             self.slot_of[obj.id] = item.get("slot")
+            self._freeze(obj)  # loaded poses are already final — keep them as frozen colliders
             obj.set_pose(sapien.Pose(np.asarray(item["transform"], dtype=float)))
+        self.scene.update_render()
+
+    # -- physics: height auto-rest --------------------------------------- #
+    def _freeze(self, obj) -> None:
+        """Make an object an immovable (kinematic) collider. Placed objects are posed
+        by hand, so by default nothing falls; only the object being settled is woken."""
+        body = _dynamic(obj.entity)
+        if body is not None:
+            body.set_kinematic(True)
+
+    def _settle(self, obj) -> None:
+        """Drop the object straight down — x/y and orientation locked — until it rests
+        on whatever its footprint overlaps: the table, or another object. This is what
+        makes a bowl nestle into a plate and a fruit into a bowl, with the height (z)
+        set automatically while the user keeps full control of x/y and yaw. Every other
+        object stays frozen, so settling one never disturbs the rest of the scene."""
+        body = _dynamic(obj.entity)
+        if body is None:  # articulation/URDF link: leave its pose untouched
+            return
+        floor = self.scene_wrap.table["height"]            # table top: a hard lower bound
+        offset = _world_aabb_min_z(obj.entity) - obj.entity.get_pose().p[2]  # bottom vs origin (yaw is locked)
+        body.set_kinematic(False)
+        body.set_locked_motion_axes([True, True, False, True, True, True])  # free Z only
+        body.set_linear_velocity([0, 0, 0])
+        body.set_angular_velocity([0, 0, 0])
+        for i in range(SETTLE_STEPS):
+            self.scene.step()
+            if offset + obj.entity.get_pose().p[2] < floor - 1e-3:  # nothing under it -> stop before it drifts off
+                break
+            if i > 15 and float(np.linalg.norm(body.get_linear_velocity())) < SETTLE_REST_V:
+                break
+        body.set_locked_motion_axes([False] * 6)
+        body.set_kinematic(True)
+        bottom = _world_aabb_min_z(obj.entity)             # clamp: never let it sink below the table
+        if bottom < floor:
+            p = obj.entity.get_pose()
+            obj.entity.set_pose(sapien.Pose([p.p[0], p.p[1], p.p[2] + floor - bottom], p.q))
         self.scene.update_render()
 
     # -- editing ---------------------------------------------------------- #
@@ -167,10 +218,12 @@ class SceneEditor:
         obj = spawn(self.scene, LIBRARY[asset_id], f"{asset_id}#{self._counter}")
         self.objects[obj.id] = obj
         self.slot_of[obj.id] = slot
+        self._freeze(obj)
         obj.set_pose(sapien.Pose([point[0], point[1], point[2]], [1, 0, 0, 0]))
         self.scene.update_render()
-        pose = obj.get_pose()  # rest the bottom on the clicked surface
+        pose = obj.get_pose()  # rest the bottom on the clicked surface, then let it settle/nest
         obj.set_pose(sapien.Pose([pose.p[0], pose.p[1], pose.p[2] + point[2] - _world_aabb_min_z(obj.entity)], pose.q))
+        self._settle(obj)
         self.selected = obj.id
         return obj.id
 
@@ -197,15 +250,18 @@ class SceneEditor:
         if self.selected == scene_id:
             self.selected = None
 
-    def key(self, name: str) -> None:
+    def key(self, name: str, fine: bool = False) -> None:
         if not self.selected:
             return
         obj = self.objects[self.selected]
         pose = obj.get_pose()
         if name in "wasd":
-            dx, dy = {"w": (0, TRANS_STEP), "s": (0, -TRANS_STEP), "a": (-TRANS_STEP, 0), "d": (TRANS_STEP, 0)}[name]
+            step = TRANS_FINE if fine else TRANS_STEP
+            dx, dy = {"w": (0, step), "s": (0, -step), "a": (-step, 0), "d": (step, 0)}[name]
             obj.set_pose(sapien.Pose([pose.p[0] + dx, pose.p[1] + dy, pose.p[2]], pose.q))
+            self._settle(obj)  # re-rest at the new x/y (height follows the support beneath it)
         elif name in "qe":
-            angle = YAW_STEP if name == "q" else -YAW_STEP
+            angle = (YAW_FINE if fine else YAW_STEP) * (1 if name == "q" else -1)
             spin = sapien.Pose(q=[np.cos(angle / 2), 0, 0, np.sin(angle / 2)])
             obj.set_pose(sapien.Pose(pose.p, (spin * sapien.Pose(q=pose.q)).q))
+            self._settle(obj)  # footprint changed — re-rest at the new yaw

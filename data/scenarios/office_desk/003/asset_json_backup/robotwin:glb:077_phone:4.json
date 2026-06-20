@@ -1,0 +1,98 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:077_phone:4",
+  "label": "077_phone · 4",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "077_phone",
+    "model_id": "4",
+    "source_asset_id": "077_phone:4",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/077_phone/visual/base4.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/077_phone/model_data4.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "phone",
+      "Desk"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/077_phone/visual/base4.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/077_phone/collision/base4.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.078,
+      0.078,
+      0.078
+    ],
+    "stable_rotation": [
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.038784225404,
+        -0.075462343097,
+        -0.001358494084
+      ],
+      "max": [
+        0.038783811629,
+        0.075456931472,
+        0.016719891608
+      ],
+      "aabb_center": [
+        -2.06888e-07,
+        -2.705812e-06,
+        0.007680698762
+      ],
+      "size": [
+        0.077568037033,
+        0.150919274569,
+        0.018078385692
+      ],
+      "bottom_z": -0.001358494084
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

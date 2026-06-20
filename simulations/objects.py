@@ -22,6 +22,7 @@ import numpy as np
 import sapien.core as sapien
 
 ASSET_LIBRARY_ROOT = Path("/home/hjs/Projects/table_arrangement/organize_it_v2/data/asset_library")
+ASSET_JSON_BACKUP_DIR = "asset_json_backup"
 
 Vec3 = tuple[float, float, float]
 Mat3 = tuple[Vec3, Vec3, Vec3]
@@ -72,20 +73,21 @@ def spawn(scene: sapien.Scene, asset: Asset, id: str) -> SceneObject:
 
 
 class AssetLibrary:
-    def __init__(self, root: Path = ASSET_LIBRARY_ROOT) -> None:
+    def __init__(self, root: Path = ASSET_LIBRARY_ROOT, backup_dir: Path | None = None) -> None:
         self.root = root
         catalog = _read(root / "catalog.json")
         self._source_roots = {name: Path(value).expanduser() for name, value in catalog["source_roots"].items()}
         self._object_tags = set(catalog["object_tags"])
         index = _read(root / "assets.json")["assets"]
-        self.assets = {entry["asset_id"]: self._parse(root / entry["asset_json"]) for entry in index}
-        self._asset_json = {entry["asset_id"]: root / entry["asset_json"] for entry in index}
+        self._library_asset_json = {entry["asset_id"]: root / entry["asset_json"] for entry in index}
+        self.load_asset_json_backup(backup_dir)
 
-    def _parse(self, asset_json: Path) -> Asset:
+    def _parse(self, asset_json: Path, asset_dir: Path | None = None) -> Asset:
         record = _read(asset_json)
         geometry = record["geometry"]
         source_root = self._source_roots[record["source"]]
-        mesh = lambda ref: _resolve(ref, asset_dir=asset_json.parent, source_root=source_root)
+        asset_dir = asset_dir or asset_json.parent
+        mesh = lambda ref: _resolve(ref, asset_dir=asset_dir, source_root=source_root)
         return Asset(
             id=record["asset_id"],
             tags=tuple(tag for tag in record["semantics"]["tags"] if tag in self._object_tags),
@@ -96,6 +98,19 @@ class AssetLibrary:
             collision_mesh=mesh(geometry["collision_mesh"]),
             pybullet_collision_mesh=mesh(geometry["pybullet_collision_mesh"] or geometry["collision_mesh"]),
         )
+
+    def load_asset_json_backup(self, backup_dir: Path | None) -> None:
+        """Overlay asset.json records from one scene folder's backup directory."""
+        self._asset_json = dict(self._library_asset_json)
+        self.assets = {aid: self._parse(path) for aid, path in self._asset_json.items()}
+        if backup_dir is None or not backup_dir.is_dir():
+            return
+        for path in sorted(backup_dir.glob("*.json")):
+            record = _read(path)
+            asset_id = record["asset_id"]
+            asset_dir = self._library_asset_json.get(asset_id, path).parent
+            self._asset_json[asset_id] = path
+            self.assets[asset_id] = self._parse(path, asset_dir=asset_dir)
 
     def asset_json_path(self, asset_id: str) -> Path:
         """On-disk record for an asset, to read fields not kept on Asset
@@ -132,6 +147,41 @@ class AssetLibrary:
 
 def _read(path: Path) -> dict:
     return json.loads(path.read_text())
+
+
+def asset_json_backup_dir(scene_json_path: Path) -> Path:
+    return Path(scene_json_path).parent / ASSET_JSON_BACKUP_DIR
+
+
+def asset_json_backup_path(backup_dir: Path, asset_id: str) -> Path:
+    if "/" in asset_id:
+        raise ValueError(f"asset_id cannot be used as a backup filename: {asset_id}")
+    return Path(backup_dir) / f"{asset_id}.json"
+
+
+def scene_asset_ids(scene_data: dict) -> list[str]:
+    ids: list[str] = []
+    seen: set[str] = set()
+    for section in ("manifest", "items"):
+        for item in scene_data.get(section, []):
+            asset_id = item.get("asset_id")
+            if asset_id and asset_id not in seen:
+                seen.add(asset_id)
+                ids.append(asset_id)
+    return ids
+
+
+def write_asset_json_backup(scene_json_path: Path, scene_data: dict, library: AssetLibrary) -> int:
+    backup_dir = asset_json_backup_dir(scene_json_path)
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for asset_id in scene_asset_ids(scene_data):
+        record = _read(library.asset_json_path(asset_id))
+        asset_json_backup_path(backup_dir, asset_id).write_text(
+            json.dumps(record, indent=2, ensure_ascii=False)
+        )
+        count += 1
+    return count
 
 
 def _rotation_pose(rotation: Mat3) -> sapien.Pose:

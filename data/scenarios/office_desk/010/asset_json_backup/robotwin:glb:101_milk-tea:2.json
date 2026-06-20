@@ -1,0 +1,99 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:101_milk-tea:2",
+  "label": "101_milk-tea · 2",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "101_milk-tea",
+    "model_id": "2",
+    "source_asset_id": "101_milk-tea:2",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/101_milk-tea/visual/base2.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/101_milk-tea/model_data2.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Kitchen",
+      "drink",
+      "Desk"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/101_milk-tea/visual/base2.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/101_milk-tea/collision/base2.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.08,
+      0.08,
+      0.08
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.04574886322,
+        -0.045748853683,
+        -0.001382879168
+      ],
+      "max": [
+        0.045770463943,
+        0.045845370293,
+        0.153427753448
+      ],
+      "aabb_center": [
+        1.0800362e-05,
+        4.8258305e-05,
+        0.07602243714
+      ],
+      "size": [
+        0.091519327164,
+        0.091594223976,
+        0.154810632616
+      ],
+      "bottom_z": -0.001382879168
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

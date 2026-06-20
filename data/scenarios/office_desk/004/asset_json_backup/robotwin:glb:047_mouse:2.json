@@ -1,0 +1,98 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:047_mouse:2",
+  "label": "047_mouse · 2",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "047_mouse",
+    "model_id": "2",
+    "source_asset_id": "047_mouse:2",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/047_mouse/visual/base2.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/047_mouse/model_data2.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "mouse",
+      "Desk"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/047_mouse/visual/base2.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/047_mouse/collision/base2.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.3304151798308715,
+      0.3304151798308715,
+      0.3304151798308715
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.03169707618205233,
+        -0.05473341573943285,
+        -0.0009930000317069471
+      ],
+      "max": [
+        0.0316894569575183,
+        0.05503172991322133,
+        0.040628490982180236
+      ],
+      "aabb_center": [
+        -3.809611853996537e-06,
+        0.00014915708689424491,
+        0.019817745475649663
+      ],
+      "size": [
+        0.06338653313957063,
+        0.10976514565182816,
+        0.04162149101388719
+      ],
+      "bottom_z": -0.0009930000317069471
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

@@ -1,0 +1,92 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "objaverse:glb:table_lamp:4",
+  "label": "table lamp 4",
+  "source": "objaverse",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "table_lamp",
+    "model_id": "4",
+    "source_asset_id": "20880b3810a7458e8e5257f249ccb65b",
+    "lvis_category": "table_lamp"
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "lamp",
+      "office"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "asset_dir",
+      "path": "source/model.glb"
+    },
+    "collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.018537752539895765,
+      0.018537752539895765,
+      0.018537752539895765
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.087821996269,
+        -0.140654624598,
+        -0.000755982539
+      ],
+      "max": [
+        0.218535828501,
+        0.115656831889,
+        0.399244017461
+      ],
+      "aabb_center": [
+        0.065356916116,
+        -0.012498896354,
+        0.199244017461
+      ],
+      "size": [
+        0.30635782477,
+        0.256311456486,
+        0.4
+      ],
+      "bottom_z": -0.000755982539
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.05,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

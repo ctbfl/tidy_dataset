@@ -1,0 +1,100 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:012_plant-pot:0",
+  "label": "012_plant-pot · 0",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "012_plant-pot",
+    "model_id": "0",
+    "source_asset_id": "012_plant-pot:0",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/012_plant-pot/visual/base0.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/012_plant-pot/model_data0.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "plant_pot",
+      "plant",
+      "pot"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/012_plant-pot/visual/base0.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/012_plant-pot/collision/base0.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.1,
+      0.1,
+      0.1
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.067792481184,
+        -0.074762010574,
+        -0.001731660031
+      ],
+      "max": [
+        0.066865569353,
+        0.070850628614,
+        0.189695215225
+      ],
+      "aabb_center": [
+        -0.000463455915,
+        -0.00195569098,
+        0.093981777597
+      ],
+      "size": [
+        0.134658050537,
+        0.145612639189,
+        0.191426875256
+      ],
+      "bottom_z": -0.001731660031
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

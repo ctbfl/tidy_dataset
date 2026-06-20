@@ -1,0 +1,99 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:017_calculator:5",
+  "label": "017_calculator · 5",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "017_calculator",
+    "model_id": "5",
+    "source_asset_id": "017_calculator:5",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/017_calculator/visual/base5.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/017_calculator/model_data5.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "calculator",
+      "office"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/017_calculator/visual/base5.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/017_calculator/collision/base5.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.08309780384549614,
+      0.08309780384549614,
+      0.08309780384549614
+    ],
+    "stable_rotation": [
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.044934352119,
+        -0.079704379295,
+        -0.001428649837
+      ],
+      "max": [
+        0.044936085674,
+        0.080295620705,
+        0.017076510091
+      ],
+      "aabb_center": [
+        8.66778e-07,
+        0.000295620705,
+        0.007823930127
+      ],
+      "size": [
+        0.089870437793,
+        0.16,
+        0.018505159927
+      ],
+      "bottom_z": -0.001428649837
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

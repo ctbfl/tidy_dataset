@@ -19,6 +19,7 @@ from fastapi.responses import HTMLResponse
 from PIL import Image
 
 from editor import SceneEditor
+from objects import asset_json_backup_dir, write_asset_json_backup
 from preview import PreviewRenderer
 from scene import LIBRARY
 from robotwin_utils import curated_textures
@@ -54,7 +55,9 @@ def _save_scene(name: str | None = None) -> str:
     else:
         n = max((int(p.stem) for p in SAVE_DIR.glob("*.json") if p.stem.isdigit()), default=0) + 1
         path = SAVE_DIR / f"{n:04d}.json"
-    path.write_text(json.dumps(editor.scene_dict(), indent=2))
+    scene = editor.scene_dict()
+    path.write_text(json.dumps(scene, indent=2))
+    write_asset_json_backup(path, scene, LIBRARY)
     return path.name
 
 
@@ -67,6 +70,7 @@ def _load_scene(name: str) -> None:
     path = (SAVE_DIR / name).resolve()
     if path.parent != SAVE_DIR.resolve() or not path.is_file():
         raise FileNotFoundError(name)
+    LIBRARY.load_asset_json_backup(asset_json_backup_dir(path))
     with GPU:
         editor.load_scene_dict(json.loads(path.read_text()))
 
@@ -110,6 +114,7 @@ def _load_scenario_scene(scenario: str, scene: str, arrangement: str) -> None:
     path = _scenario_scene_path(scenario, scene, arrangement)
     if not path.is_file():
         raise FileNotFoundError(f"{scenario}/{scene}/{arrangement}")
+    LIBRARY.load_asset_json_backup(asset_json_backup_dir(path))
     with GPU:
         editor.load_scene_dict(json.loads(path.read_text()))
 
@@ -117,7 +122,9 @@ def _load_scenario_scene(scenario: str, scene: str, arrangement: str) -> None:
 def _save_scenario_scene() -> str:
     path = _scenario_scene_path(editor.scenario, editor.scene_id, editor.arrangement)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(editor.scene_dict(), indent=2, ensure_ascii=False))
+    scene = editor.scene_dict()
+    path.write_text(json.dumps(scene, indent=2, ensure_ascii=False))
+    write_asset_json_backup(path, scene, LIBRARY)
     return f"{editor.scenario}/{editor.scene_id}/{path.name}"
 
 
@@ -199,7 +206,7 @@ async def ws(socket: WebSocket):
             elif kind == "delete":
                 editor.delete(msg["scene_id"])
             elif kind == "key":
-                editor.key(msg["name"])
+                editor.key(msg["name"], msg.get("fine", False))
             elif kind == "clear":
                 editor.clear()
             elif kind == "save":

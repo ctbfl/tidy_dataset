@@ -1,0 +1,98 @@
+{
+  "schema_version": "asset_v2",
+  "asset_id": "robotwin:glb:120_plant:0",
+  "label": "120_plant · 0",
+  "source": "robotwin",
+  "model_type": "glb",
+  "source_specific_terms": {
+    "model_name": "120_plant",
+    "model_id": "0",
+    "source_asset_id": "120_plant:0",
+    "source_path": {
+      "base": "source_root",
+      "path": "assets/objects/120_plant/visual/base0.glb"
+    },
+    "metadata_path": {
+      "base": "source_root",
+      "path": "assets/objects/120_plant/model_data0.json"
+    }
+  },
+  "semantics": {
+    "tags": [
+      "Desk",
+      "plant"
+    ],
+    "yaw_sensitive": true,
+    "enabled": true
+  },
+  "geometry": {
+    "visual_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/120_plant/visual/base0.glb"
+    },
+    "collision_mesh": {
+      "base": "source_root",
+      "path": "assets/objects/120_plant/collision/base0.glb"
+    },
+    "pybullet_collision_mesh": {
+      "base": "asset_dir",
+      "path": "derived/collision.obj"
+    },
+    "scale": [
+      0.08,
+      0.08,
+      0.08
+    ],
+    "stable_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "aabb_m": {
+      "frame": "stable",
+      "unit": "m",
+      "source": "pybullet_collision_mesh",
+      "source_mesh": "derived/collision.obj",
+      "min": [
+        -0.070648713112,
+        -0.073492941856,
+        -0.001391887218
+      ],
+      "max": [
+        0.067619748116,
+        0.073756899834,
+        0.152327232361
+      ],
+      "aabb_center": [
+        -0.001514482498,
+        0.000131978989,
+        0.075467672572
+      ],
+      "size": [
+        0.138268461227,
+        0.14724984169,
+        0.153719119579
+      ],
+      "bottom_z": -0.001391887218
+    }
+  },
+  "physics": {
+    "source": "default",
+    "mass": 0.03,
+    "friction": 1.2,
+    "restitution": 0.0
+  },
+  "contacts": {}
+}

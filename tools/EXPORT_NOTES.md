@@ -1,11 +1,17 @@
 # tidy → organize_it 数据导出：约定与经验
 
-本目录两个脚本：
+本目录脚本：
 
-- `export_to_organize_it.py`：把手搓的 v0 场景（`data/tidy_scene_v0/*.json`）转成 organize_it 的
-  `scene.json` + `tabletop_area.json`。
+- `export_to_organize_it.py`：把手搓场景（v0 `data/tidy_scene_v0/*.json`，或 v2 scenario 文件）转成
+  organize_it 的 `scene.json` + `tabletop_area.json`。已支持 `version` 1 与 2（v2 多出的
+  scenario/manifest/slot 不影响几何，items 仍是同样的 stable 帧 `transform`+`asset_id`）。
 - `render_organize_it_scene.py`：用我们自己的 SAPIEN loader 渲染该场景，产出 pipeline 能直接消费的
   采集文件（RGB / 深度 / 内外参 / GT 分割）。
+- `export_v1.py`：**scenario 批量入口**。输入一个 scenario 目录（如 `data/scenarios/office_desk`），
+  对每个子场景文件夹**就地**产出：① `messy.json` → 完整输入契约（`scene.json` + `tabletop_area.json`
+  + `current.png/_depth.pkl/_intrinsics.yaml/_extrinsics.yaml` + GT 分割）；② `tidy.json` →
+  `reference_goal.png`（仅渲染，同一标定相机，和 `current.png` 对齐，作目标图）。每个场景在**独立子进程**
+  里渲染（SAPIEN 不释放单个场景的 GPU 资源，几十个挤一个进程会耗尽显卡）。`--no-render` 只转 `scene.json`。
 
 下面是「怎么做才对」的核心约定，最后附常见易错点。
 
