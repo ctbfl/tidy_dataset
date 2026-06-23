@@ -1,28 +1,23 @@
-# use the organizeit asset schema
-# see here /home/hjs/Projects/table_arrangement/organize_it_v2/data/asset_library
-
-# Recognize all the items inside the asset library
-# And load then onto the RoboTwin/Pybullet simulator.
-
-# 1. object register
-#    put all assets
-# 2. object fetching (parse the asset information and file path)
-# 3. object self-transform wrapper (use a more user friendly axis definition to use the assets)
-#    pose = tidy_scene.get_pose(obj), already in stable transform coordination system.
-#    tidy_scene.set_pose(obj), will automatically use the stable transform coordination system, and covert to raw SAPIEN pose.
-
-
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import sapien.core as sapien
 
-ASSET_LIBRARY_ROOT = Path("/home/hjs/Projects/table_arrangement/organize_it_v2/data/asset_library")
+ORGANIZE_IT_ROOT = Path("/home/hjs/Projects/table_arrangement/organize_it_v2")
+ORGANIZE_IT_SRC = ORGANIZE_IT_ROOT / "src"
+if str(ORGANIZE_IT_SRC) not in sys.path:
+    sys.path.insert(0, str(ORGANIZE_IT_SRC))
+
+from organize_it.assets.registry import AssetHandle, AssetRegistry  # noqa: E402
+
+ASSET_LIBRARY_ROOT = ORGANIZE_IT_ROOT / "data" / "asset_library"
 ASSET_JSON_BACKUP_DIR = "asset_json_backup"
+NONCONVEX_CONTAINER_TAGS = {"holder"}
 
 Vec3 = tuple[float, float, float]
 Mat3 = tuple[Vec3, Vec3, Vec3]
@@ -30,14 +25,49 @@ Mat3 = tuple[Vec3, Vec3, Vec3]
 
 @dataclass(frozen=True)
 class Asset:
-    id: str
-    tags: tuple[str, ...]  # object-class tags, drawn from the catalog vocabulary
-    source: str  # robotwin / objaverse / lightwheel / sgbot / gso
-    scale: Vec3
-    stable_rotation: Mat3
-    visual_mesh: Path
-    collision_mesh: Path
-    pybullet_collision_mesh: Path
+    handle: AssetHandle
+    scale: Vec3 | None = None
+
+    def __post_init__(self) -> None:
+        if self.scale is None:
+            object.__setattr__(self, "scale", tuple(float(v) for v in self.handle.record.geometry.scale))
+
+    @property
+    def id(self) -> str:
+        return self.handle.asset_id
+
+    @property
+    def label(self) -> str:
+        return self.handle.record.label
+
+    @property
+    def tags(self) -> tuple[str, ...]:
+        return tuple(self.handle.record.semantics.tags)
+
+    @property
+    def source(self) -> str:
+        return self.handle.record.source
+
+    @property
+    def stable_rotation(self) -> Mat3:
+        return tuple(tuple(float(v) for v in row) for row in self.handle.record.geometry.stable_rotation)
+
+    @property
+    def visual_mesh(self) -> Path:
+        return self.handle.visual_mesh_path()
+
+    @property
+    def collision_mesh(self) -> Path:
+        return self.handle.collision_mesh_path()
+
+    @property
+    def collision_shape(self) -> str:
+        data = json.loads(self.handle.asset_json_path.read_text())
+        return str(data.get("geometry", {}).get("collision_shape") or "")
+
+    @property
+    def pybullet_collision_mesh(self) -> Path:
+        return self.handle.pybullet_mesh_path()
 
 
 @dataclass(frozen=True)
@@ -57,77 +87,49 @@ class SceneObject:
 
 
 def spawn(scene: sapien.Scene, asset: Asset, id: str) -> SceneObject:
+    scale = tuple(float(v) for v in asset.scale)
     if asset.visual_mesh.suffix == ".urdf":  # urdf bakes its own meshes + scale
         loader = scene.create_urdf_loader()
-        loader.scale = asset.scale[0]
+        loader.scale = scale[0]
         loader.fix_root_link = False
         entity = loader.load_multiple(str(asset.visual_mesh))[1][0]
         entity.set_name(id)
     else:
         builder = scene.create_actor_builder()
         builder.set_physx_body_type("dynamic")
-        builder.add_multiple_convex_collisions_from_file(filename=str(asset.collision_mesh), scale=asset.scale)
-        builder.add_visual_from_file(filename=str(asset.visual_mesh), scale=asset.scale)
+        shape = asset.collision_shape
+        if shape == "compound_convex" or (not shape and not _needs_nonconvex_collision(asset)):
+            builder.add_multiple_convex_collisions_from_file(filename=str(asset.collision_mesh), scale=scale)
+        elif shape == "nonconvex" or (not shape and _needs_nonconvex_collision(asset)):
+            builder.add_nonconvex_collision_from_file(filename=str(asset.collision_mesh), scale=scale)
+        else:
+            raise ValueError(f"unsupported collision_shape for {asset.id}: {shape!r}")
+        builder.add_visual_from_file(filename=str(asset.visual_mesh), scale=scale)
         entity = builder.build(name=id)
     return SceneObject(id, asset, entity, _rotation_pose(asset.stable_rotation))
 
 
+def _needs_nonconvex_collision(asset: Asset) -> bool:
+    tags = {tag.lower() for tag in asset.tags}
+    return bool(tags & NONCONVEX_CONTAINER_TAGS)
+
+
 class AssetLibrary:
     def __init__(self, root: Path = ASSET_LIBRARY_ROOT, backup_dir: Path | None = None) -> None:
-        self.root = root
-        catalog = _read(root / "catalog.json")
-        self._source_roots = {name: Path(value).expanduser() for name, value in catalog["source_roots"].items()}
-        self._object_tags = set(catalog["object_tags"])
-        index = _read(root / "assets.json")["assets"]
-        self._library_asset_json = {entry["asset_id"]: root / entry["asset_json"] for entry in index}
+        self.root = Path(root)
+        self.catalog_path = self.root / "catalog.json"
         self.load_asset_json_backup(backup_dir)
 
-    def _parse(self, asset_json: Path, asset_dir: Path | None = None) -> Asset:
-        record = _read(asset_json)
-        geometry = record["geometry"]
-        source_root = self._source_roots[record["source"]]
-        asset_dir = asset_dir or asset_json.parent
-        mesh = lambda ref: _resolve(ref, asset_dir=asset_dir, source_root=source_root)
-        return Asset(
-            id=record["asset_id"],
-            tags=tuple(tag for tag in record["semantics"]["tags"] if tag in self._object_tags),
-            source=record["source"],
-            scale=tuple(geometry["scale"]),
-            stable_rotation=tuple(tuple(row) for row in geometry["stable_rotation"]),
-            visual_mesh=mesh(geometry["visual_mesh"]),
-            collision_mesh=mesh(geometry["collision_mesh"]),
-            pybullet_collision_mesh=mesh(geometry["pybullet_collision_mesh"] or geometry["collision_mesh"]),
-        )
-
     def load_asset_json_backup(self, backup_dir: Path | None) -> None:
-        """Overlay asset.json records from one scene folder's backup directory."""
-        self._asset_json = dict(self._library_asset_json)
-        self.assets = {aid: self._parse(path) for aid, path in self._asset_json.items()}
-        if backup_dir is None or not backup_dir.is_dir():
-            return
-        for path in sorted(backup_dir.glob("*.json")):
-            record = _read(path)
-            asset_id = record["asset_id"]
-            asset_dir = self._library_asset_json.get(asset_id, path).parent
-            self._asset_json[asset_id] = path
-            self.assets[asset_id] = self._parse(path, asset_dir=asset_dir)
+        overwrite_dir = Path(backup_dir) if backup_dir is not None and Path(backup_dir).is_dir() else None
+        self.registry = AssetRegistry.load(self.catalog_path, asset_json_overwrite_dir=overwrite_dir)
+        self.assets = {handle.asset_id: Asset(handle) for handle in self.registry.list(enabled_only=False)}
 
     def asset_json_path(self, asset_id: str) -> Path:
-        """On-disk record for an asset, to read fields not kept on Asset
-        (e.g. geometry.aabb_m)."""
-        return self._asset_json[asset_id]
+        return self.registry.get(asset_id).asset_json_path
 
     def is_enabled(self, asset_id: str) -> bool:
-        """Read the asset's CURRENT semantics.enabled straight from disk (live, not a
-        startup snapshot), so toggling an asset off takes effect immediately. Unknown
-        ids and read errors count as disabled / enabled-by-default respectively."""
-        path = self._asset_json.get(asset_id)
-        if path is None:
-            return False
-        try:
-            return _read(path).get("semantics", {}).get("enabled", True) is not False
-        except Exception:
-            return True
+        return self.registry.get(asset_id).record.semantics.enabled
 
     def __getitem__(self, asset_id: str) -> Asset:
         return self.assets[asset_id]
@@ -143,10 +145,6 @@ class AssetLibrary:
 
     def by_source(self, source: str) -> list[Asset]:
         return [asset for asset in self if asset.source == source]
-
-
-def _read(path: Path) -> dict:
-    return json.loads(path.read_text())
 
 
 def asset_json_backup_dir(scene_json_path: Path) -> Path:
@@ -176,7 +174,7 @@ def write_asset_json_backup(scene_json_path: Path, scene_data: dict, library: As
     backup_dir.mkdir(parents=True, exist_ok=True)
     count = 0
     for asset_id in scene_asset_ids(scene_data):
-        record = _read(library.asset_json_path(asset_id))
+        record = json.loads(library.asset_json_path(asset_id).read_text())
         asset_json_backup_path(backup_dir, asset_id).write_text(
             json.dumps(record, indent=2, ensure_ascii=False)
         )
@@ -188,13 +186,6 @@ def _rotation_pose(rotation: Mat3) -> sapien.Pose:
     matrix = np.eye(4)
     matrix[:3, :3] = rotation
     return sapien.Pose(matrix)
-
-
-def _resolve(ref: dict, *, asset_dir: Path, source_root: Path) -> Path:
-    base, path = ref["base"], Path(ref["path"]).expanduser()
-    if base == "absolute":
-        return path.resolve()
-    return ((asset_dir if base == "asset_dir" else source_root) / path).resolve()
 
 
 if __name__ == "__main__":

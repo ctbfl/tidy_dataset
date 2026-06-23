@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>organize_it_dataset_v2 handcraft</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; background: #15161a; color: #ddd;
+         font-family: ui-sans-serif, system-ui, sans-serif; display: flex; }
+  #stage { position: relative; flex: 1; background: #0c0d10; display: flex; }
+  #scene { margin: auto; max-width: 100%; max-height: 100vh; cursor: crosshair; }
+  #selectBox { position: absolute; border: 1px solid #f3d75c; background: rgba(243,215,92,0.14);
+               pointer-events: none; display: none; }
+  #hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: #8b94a3;
+          background: rgba(20,22,28,0.7); padding: 5px 9px; border-radius: 4px; }
+  #specialHint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+                 display: none; max-width: min(720px, 60%); text-align: center;
+                 font-size: 13px; color: #f1d36f; background: rgba(20,22,28,0.86);
+                 border: 1px solid rgba(241,211,111,0.35); padding: 7px 12px; border-radius: 5px; }
+  #specialMenu { position: absolute; right: 12px; top: 12px; background: rgba(29,31,37,0.94);
+                 border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+  #specialMenu summary { cursor: pointer; color: #d8dde8; padding: 4px 0; user-select: none; }
+  #specialMenu button { width: 100%; margin: 4px 0; background: #34465f; color: #fff;
+                        border: none; padding: 7px 10px; border-radius: 4px; cursor: pointer; font: inherit; }
+  #specialMenu button:hover { background: #425a7c; }
+  #actions { position: absolute; right: 12px; bottom: 10px; display: flex; gap: 8px; }
+  #actions button { color: #fff; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font: inherit; }
+  #save { background: #2f6b4e; } #save:hover { background: #3a8762; }
+  #clear { background: #6b3a2f; } #clear:hover { background: #87493a; }
+
+  /* floating, foldable object list */
+  #objects { position: absolute; left: 12px; top: 12px; width: 240px; background: rgba(29,31,37,0.94);
+             border-radius: 6px; overflow: hidden; font-size: 13px; }
+  #objects h3 { margin: 0; padding: 8px 12px; font-size: 13px; cursor: pointer; background: #232732; }
+  #objects.folded ul { display: none; }
+  #objects ul { list-style: none; margin: 0; padding: 4px; max-height: 60vh; overflow: auto; }
+  #objects li { display: flex; align-items: center; gap: 6px; padding: 5px 7px; border-radius: 4px; cursor: pointer; }
+  #objects li:hover { background: #2b303b; }
+  #objects li.sel { background: #3a4a78; }
+  #objects li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #objects li small { color: #8b94a3; }
+  #objects li button { background: #6b3a2f; border: none; color: #fff; border-radius: 3px; cursor: pointer; padding: 1px 7px; }
+
+  /* right panel */
+  #browser { width: 380px; background: #1b1d22; display: flex; flex-direction: column; padding: 10px; gap: 10px; overflow: auto; }
+  #picker { display: flex; flex-direction: column; gap: 6px; }
+  #picker .row { display: flex; gap: 6px; align-items: center; }
+  #picker label { width: 64px; font-size: 12px; color: #8b94a3; }
+  #picker select { flex: 1; background: #2b2f38; color: #ddd; border: none; padding: 7px; border-radius: 4px; font: inherit; }
+  #progress { font-size: 12px; color: #6fb98f; }
+  #info { background: #12141a; border-radius: 5px; padding: 8px; font-size: 12px; line-height: 1.45; }
+  #info div + div { margin-top: 7px; }
+  #info b { display: block; color: #8b94a3; font-weight: 600; margin-bottom: 2px; }
+  #info span { color: #d8dde8; }
+
+  /* manifest checklist */
+  #manifest { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; align-content: start; }
+  .mcard { position: relative; background: #0c0d10; border-radius: 5px; aspect-ratio: 1; cursor: grab;
+           border: 2px solid transparent; }
+  .mcard:hover { border-color: #3a4a78; }
+  .mcard.placed { cursor: default; opacity: 0.55; }
+  .mcard.placed:hover { border-color: transparent; }
+  .mcard img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .mrole { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; text-align: center;
+           color: #c7ccd6; background: rgba(12,13,16,0.7); padding: 1px 0; pointer-events: none;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .check { position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%;
+           background: #2fae5f; color: #fff; font-size: 12px; line-height: 18px; text-align: center;
+           box-shadow: 0 0 0 2px rgba(12,13,16,0.8); pointer-events: none; }
+
+  details { background: #161820; border-radius: 5px; padding: 4px 8px; }
+  details > summary { cursor: pointer; font-size: 12px; color: #aab2c0; padding: 4px 0; user-select: none; }
+  .bg-row { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+  .bg-row label { width: 48px; font-size: 12px; color: #8b94a3; }
+  .bg-row select { flex: 1; background: #2b2f38; color: #ddd; border: none; padding: 6px; border-radius: 4px; font: inherit; }
+  .bg-btns { display: flex; gap: 6px; margin-top: 6px; }
+  .bg-btns button { flex: 1; background: #34465f; color: #fff; border: none; padding: 7px; border-radius: 4px; cursor: pointer; font: inherit; }
+  #filters input, #filters select { width: 100%; background: #2b2f38; color: #ddd; border: none;
+                                     padding: 7px; border-radius: 4px; font: inherit; margin: 6px 0 0; }
+  #grid { margin-top: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; align-content: start;
+          max-height: 40vh; overflow: auto; }
+  .cell { position: relative; background: #0c0d10; border-radius: 5px; aspect-ratio: 1; cursor: grab; border: 2px solid transparent; }
+  .cell:hover { border-color: #3a4a78; }
+  .cell img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .cell-label { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; text-align: center;
+                color: #c7ccd6; background: rgba(12,13,16,0.74); padding: 1px 2px; pointer-events: none;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #count { font-size: 12px; color: #8b94a3; margin-top: 6px; }
+  #sizePanel { position: absolute; z-index: 10; width: 250px; background: #20242d; border: 1px solid #39404f;
+               border-radius: 6px; padding: 10px; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+               font-size: 12px; }
+  #sizePanel b { display: block; color: #d8dde8; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #sizePanel label { display: block; color: #8b94a3; margin: 6px 0 3px; }
+  #sizePanel input { width: 100%; background: #12141a; color: #ddd; border: 1px solid #39404f; border-radius: 4px; padding: 6px; font: inherit; }
+  #sizePanel .row { display: flex; gap: 6px; margin-top: 8px; }
+  #sizePanel button { flex: 1; border: none; border-radius: 4px; padding: 7px; color: #fff; cursor: pointer; font: inherit; }
+  #sizeApply { background: #2f6b4e; }
+  #sizeClose { background: #4c5363; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="scene" width="1024" height="768"></canvas>
+    <div id="selectBox"></div>
+    <div id="sizePanel">
+      <b id="sizeAsset"></b>
+      <label>Scale factor</label>
+      <input id="sizeFactor" type="number" min="0.05" max="5" step="0.01" />
+      <label>Current scale</label>
+      <input id="sizeScale" readonly />
+      <div class="row">
+        <button id="sizeApply">Apply</button>
+        <button id="sizeClose">Close</button>
+      </div>
+    </div>
+    <div id="objects"><h3 id="objects-head">Objects (0)</h3><ul id="objects-list"></ul></div>
+    <details id="specialMenu">
+      <summary>Special Relation</summary>
+      <button id="penInHolder">Pen in Holder</button>
+    </details>
+    <div id="specialHint"></div>
+    <div id="hint">drag onto table &middot; click select &middot; drag box select &middot; right-click size &middot; WASD move &middot; Q/E yaw</div>
+    <div id="actions">
+      <button id="clear">Clear</button>
+      <button id="save">Save scene</button>
+    </div>
+  </div>
+
+  <div id="browser">
+    <div id="picker">
+      <div class="row"><label>Scenario</label><select id="scenario"></select></div>
+      <div class="row"><label>Variation</label><select id="sceneSel"></select></div>
+      <div class="row"><label>Scene</label><select id="sampleSel"></select></div>
+      <div class="row"><label>State</label><select id="arrangeSel"></select></div>
+      <div id="progress"></div>
+    </div>
+
+    <div id="info">
+      <div><b>Scene description</b><span id="sceneDescription"></span></div>
+      <div><b>User note</b><span id="userNote"></span></div>
+    </div>
+
+    <div id="manifest"></div>
+
+    <details id="extra" open>
+      <summary>Add extra object (full library)</summary>
+      <div id="filters">
+        <input id="search" placeholder="search id / label / tag..." />
+        <select id="tag"><option value="">all tags</option></select>
+        <select id="source"><option value="">all sources</option></select>
+        <div id="count"></div>
+      </div>
+      <div id="grid"></div>
+    </details>
+
+    <details id="bgbox">
+      <summary>Background (table / wall texture)</summary>
+      <div class="bg-row"><label>Table</label><select id="bgTable"><option value="">(plain)</option></select></div>
+      <div class="bg-row"><label>Wall</label><select id="bgWall"><option value="">(plain)</option></select></div>
+      <div class="bg-btns">
+        <button id="bgApply">Apply</button>
+        <button id="bgRandom">Randomize</button>
+      </div>
+    </details>
+  </div>
+
+<script>
+const canvas = document.getElementById('scene');
+const ctx = canvas.getContext('2d');
+const img = new Image();
+img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+const ws = new WebSocket((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws');
+const send = (m) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
+
+const hintEl = document.getElementById('hint');
+const HINT = hintEl.textContent;
+function flashHint(text) { hintEl.textContent = text; setTimeout(() => hintEl.textContent = HINT, 2000); }
+const specialHint = document.getElementById('specialHint');
+let specialMode = null;
+function setSpecialMode(mode, text) {
+  specialMode = mode;
+  specialHint.textContent = text || '';
+  specialHint.style.display = mode ? 'block' : 'none';
+}
+
+let selected = null;          // selected scene object id
+let selectedIds = new Set();
+let dragPayload = null;       // {slot} from a checklist card, or {asset_id} from the extra library
+let boxSelect = null;
+let suppressClick = false;
+
+ws.onmessage = (ev) => {
+  const msg = JSON.parse(ev.data);
+  if (msg.type === 'saved') { flashHint('saved → ' + msg.name); refreshSceneProgress(); return; }
+  if (msg.type === 'loaded') { flashHint('loaded → ' + msg.name); return; }
+  if (msg.type === 'warning') {
+    alert('Asset library changed. Loaded current assets and re-settled the scene.\n\n' + msg.warnings.join('\n'));
+    return;
+  }
+  if (msg.type === 'size_target') { showSizePanel(msg.target, msg.client_x, msg.client_y); return; }
+  if (msg.type === 'special_relation') {
+    if (msg.error) { flashHint(msg.error); setSpecialMode(null); return; }
+    if (msg.done) { flashHint(msg.message); setSpecialMode(null); return; }
+    setSpecialMode(msg.relation, msg.message);
+    return;
+  }
+  img.src = 'data:image/jpeg;base64,' + msg.image;
+  const st = msg.state;
+  selected = st.selected;
+  selectedIds = new Set(st.selected_ids || (selected ? [selected] : []));
+  renderManifest(st.manifest || []);
+  renderObjects(st.objects, st.slots || {});
+  if (st.background) reflectBg(st.background);
+};
+
+document.getElementById('save').addEventListener('click', () => {
+  send({ type: 'save' });
+});
+document.getElementById('clear').addEventListener('click', () => {
+  if (confirm('Clear all placed objects from this scene?')) {
+    setSpecialMode(null);
+    send({ type: 'clear' });
+  }
+});
+document.getElementById('penInHolder').addEventListener('click', () => {
+  const message = 'Pen in Holder: first select the object to move, then select the holder/container.';
+  setSpecialMode('pen_in_holder', message);
+  send({ type: 'special_start', relation: 'pen_in_holder' });
+});
+
+// pixel mapping from a mouse event to image coordinates
+function toImage(ev) {
+  const r = canvas.getBoundingClientRect();
+  return { x: Math.round((ev.clientX - r.left) * (canvas.width / r.width)),
+           y: Math.round((ev.clientY - r.top) * (canvas.height / r.height)) };
+}
+
+function canvasPoint(ev) {
+  const r = canvas.getBoundingClientRect();
+  return { x: ev.clientX - r.left, y: ev.clientY - r.top, rect: r };
+}
+
+const selectBox = document.getElementById('selectBox');
+function drawSelectBox(a, b, rect) {
+  const stageRect = document.getElementById('stage').getBoundingClientRect();
+  const left = Math.min(a.x, b.x) + rect.left - stageRect.left;
+  const top = Math.min(a.y, b.y) + rect.top - stageRect.top;
+  selectBox.style.left = left + 'px';
+  selectBox.style.top = top + 'px';
+  selectBox.style.width = Math.abs(a.x - b.x) + 'px';
+  selectBox.style.height = Math.abs(a.y - b.y) + 'px';
+  selectBox.style.display = 'block';
+}
+
+canvas.addEventListener('mousedown', (ev) => {
+  if (ev.button !== 0) return;
+  if (specialMode) return;
+  ev.preventDefault();
+  const p = canvasPoint(ev);
+  boxSelect = { start: p, current: p };
+  drawSelectBox(p, p, p.rect);
+});
+canvas.addEventListener('mousemove', (ev) => {
+  if (!boxSelect) return;
+  ev.preventDefault();
+  const p = canvasPoint(ev);
+  boxSelect.current = p;
+  drawSelectBox(boxSelect.start, p, p.rect);
+});
+document.addEventListener('mouseup', (ev) => {
+  if (!boxSelect) return;
+  ev.preventDefault();
+  const start = boxSelect.start;
+  const end = boxSelect.current;
+  selectBox.style.display = 'none';
+  boxSelect = null;
+  if (Math.abs(start.x - end.x) < 4 && Math.abs(start.y - end.y) < 4) return;
+  suppressClick = true;
+  const r = canvas.getBoundingClientRect();
+  send({
+    type: 'select_rect',
+    x0: Math.round(start.x * (canvas.width / r.width)),
+    y0: Math.round(start.y * (canvas.height / r.height)),
+    x1: Math.round(end.x * (canvas.width / r.width)),
+    y1: Math.round(end.y * (canvas.height / r.height))
+  });
+});
+canvas.addEventListener('click', (ev) => {
+  if (suppressClick) { suppressClick = false; return; }
+  const p = toImage(ev);
+  if (specialMode) {
+    send({ type: 'special_pick', relation: specialMode, x: p.x, y: p.y });
+    return;
+  }
+  send({ type: 'select_at', x: p.x, y: p.y });
+});
+canvas.addEventListener('contextmenu', (ev) => {
+  ev.preventDefault();
+  hideSizePanel();
+  const p = toImage(ev);
+  send({ type: 'context_select', x: p.x, y: p.y, client_x: ev.clientX, client_y: ev.clientY });
+});
+
+const sizePanel = document.getElementById('sizePanel');
+const sizeAsset = document.getElementById('sizeAsset');
+const sizeFactor = document.getElementById('sizeFactor');
+const sizeScale = document.getElementById('sizeScale');
+function showSizePanel(target, x, y) {
+  if (!target) return;
+  sizeAsset.textContent = target.asset_id;
+  sizeFactor.value = Number(target.factor || 1).toFixed(3);
+  sizeScale.value = (target.scale || []).map((v) => Number(v).toFixed(4)).join(', ');
+  sizePanel.style.left = Math.min(x, window.innerWidth - 270) + 'px';
+  sizePanel.style.top = Math.min(y, window.innerHeight - 160) + 'px';
+  sizePanel.style.display = 'block';
+}
+function hideSizePanel() {
+  sizePanel.style.display = 'none';
+}
+document.getElementById('sizeApply').addEventListener('click', () => {
+  const factor = Number(sizeFactor.value);
+  if (!(factor > 0)) return;
+  send({ type: 'set_scale', factor });
+});
+document.getElementById('sizeClose').addEventListener('click', hideSizePanel);
+canvas.addEventListener('dragover', (ev) => ev.preventDefault());
+canvas.addEventListener('drop', (ev) => {
+  ev.preventDefault();
+  const p = toImage(ev);
+  if (dragPayload && dragPayload.slot) send({ type: 'place', slot: dragPayload.slot, x: p.x, y: p.y });
+  else if (dragPayload && dragPayload.asset_id) send({ type: 'place', asset_id: dragPayload.asset_id, x: p.x, y: p.y });
+  dragPayload = null;
+});
+
+document.addEventListener('keydown', (ev) => {
+  if (ev.target.tagName === 'INPUT') return;
+  if (ev.key === 'Escape' && specialMode) {
+    setSpecialMode(null);
+    send({ type: 'special_cancel' });
+    ev.preventDefault();
+    return;
+  }
+  const k = ev.key.toLowerCase();   // Shift uppercases the key — fold it back, use Shift only as the "fine" modifier
+  if ('wasdqe'.includes(k)) { send({ type: 'key', name: k, fine: ev.shiftKey }); ev.preventDefault(); }
+});
+
+// floating object list (label with slot, or "extra")
+const objectsBox = document.getElementById('objects');
+document.getElementById('objects-head').addEventListener('click', () => objectsBox.classList.toggle('folded'));
+function renderObjects(ids, slots) {
+  document.getElementById('objects-head').textContent = `Objects (${ids.length})`;
+  const ul = document.getElementById('objects-list');
+  ul.innerHTML = '';
+  for (const id of ids) {
+    const li = document.createElement('li');
+    if (selectedIds.has(id)) li.className = 'sel';
+    const label = document.createElement('span');
+    label.textContent = slots[id] || id; li.title = id;
+    li.appendChild(label);
+    if (!slots[id]) { const tag = document.createElement('small'); tag.textContent = 'extra'; li.appendChild(tag); }
+    li.addEventListener('click', () => send({ type: 'select', scene_id: id }));
+    const del = document.createElement('button');
+    del.textContent = '×';
+    del.addEventListener('click', (ev) => { ev.stopPropagation(); send({ type: 'delete', scene_id: id }); });
+    li.appendChild(del);
+    ul.appendChild(li);
+  }
+}
+
+// checklist (manifest) cards: thumbnail + role label + a green check when placed
+function renderManifest(manifest) {
+  const box = document.getElementById('manifest');
+  box.innerHTML = '';
+  let placed = 0;
+  for (const m of manifest) {
+    if (m.placed) placed++;
+    const card = document.createElement('div');
+    card.className = 'mcard' + (m.placed ? ' placed' : '');
+    card.draggable = !m.placed;            // a slot is one-shot; delete to re-place
+    card.title = `${m.slot}\n${m.asset_id}`;
+    card.addEventListener('dragstart', () => { dragPayload = { slot: m.slot }; });
+    const im = document.createElement('img');
+    im.loading = 'lazy'; im.src = '/preview?asset_id=' + encodeURIComponent(m.asset_id);
+    card.appendChild(im);
+    const role = document.createElement('div'); role.className = 'mrole'; role.textContent = m.slot;
+    card.appendChild(role);
+    if (m.placed) { const c = document.createElement('div'); c.className = 'check'; c.textContent = '✓'; card.appendChild(c); }
+    box.appendChild(card);
+  }
+  document.getElementById('progress').textContent =
+    manifest.length ? `${placed} / ${manifest.length} placed` : 'arrangement mode: use the full library';
+  const opt = [...arrangeSel.options].find((o) => o.value === arrangeSel.value);
+  if (opt && manifest.length) opt.text = `${arrangeSel.value} — ${placed}/${manifest.length}`;
+}
+
+// scenario / variation / scene / state pickers. /scenario_scenes returns
+// [{scene: variation, samples: [{name, arrangements: [{name, placed, total}]}]}].
+const scenarioSel = document.getElementById('scenario');
+const sceneSel = document.getElementById('sceneSel');
+const sampleSel = document.getElementById('sampleSel');
+const arrangeSel = document.getElementById('arrangeSel');
+let scenesCache = [];
+const arrangeLabel = (a) => {
+  if (!a.saved) return `${a.name} — not saved`;
+  if (!a.total) return `${a.name} — ${a.placed} objects`;
+  return `${a.name} — ${a.placed}/${a.total}`;
+};
+
+async function loadScenarios() {
+  const { scenarios } = await (await fetch('/scenarios')).json();
+  scenarioSel.innerHTML = '';
+  for (const s of scenarios) scenarioSel.add(new Option(s, s));
+  if (scenarios.length) await loadScenes();
+}
+async function fetchScenes() {
+  const { scenes } = await (await fetch('/scenario_scenes?scenario=' + encodeURIComponent(scenarioSel.value))).json();
+  scenesCache = scenes;
+}
+async function loadScenes() {
+  await fetchScenes();
+  sceneSel.innerHTML = '';
+  for (const s of scenesCache) sceneSel.add(new Option(s.scene, s.scene));
+  renderVariationInfo();
+  if (scenesCache.length) loadSamples();
+}
+function loadSamples() {
+  const sc = scenesCache.find((s) => s.scene === sceneSel.value);
+  sampleSel.innerHTML = '';
+  for (const sample of (sc ? sc.samples : [])) sampleSel.add(new Option(sample.name, sample.name));
+  renderVariationInfo();
+  if (sampleSel.options.length) loadArrangements();
+}
+function loadArrangements() {
+  const sc = scenesCache.find((s) => s.scene === sceneSel.value);
+  const sample = sc && sc.samples.find((x) => x.name === sampleSel.value);
+  arrangeSel.innerHTML = '';
+  for (const a of (sample ? sample.arrangements : [])) arrangeSel.add(new Option(arrangeLabel(a), a.name));
+  renderVariationInfo();
+  if (arrangeSel.options.length) loadSceneNow();
+}
+function renderVariationInfo() {
+  const sc = scenesCache.find((s) => s.scene === sceneSel.value);
+  document.getElementById('sceneDescription').textContent = sc ? sc.scene_description : '';
+  document.getElementById('userNote').textContent = sc ? sc.user_note : '';
+}
+function loadSceneNow() {
+  setSpecialMode(null);
+  send({
+    type: 'load_scene',
+    scenario: scenarioSel.value,
+    variation: sceneSel.value,
+    scene: sampleSel.value,
+    arrangement: arrangeSel.value
+  });
+}
+async function refreshSceneProgress() {  // after a save: re-read counts, keep selection
+  if (!scenarioSel.value) return;
+  await fetchScenes();
+  const sc = scenesCache.find((s) => s.scene === sceneSel.value);
+  const sample = sc && sc.samples.find((x) => x.name === sampleSel.value);
+  const a = sample && sample.arrangements.find((x) => x.name === arrangeSel.value);
+  const opt = [...arrangeSel.options].find((o) => o.value === arrangeSel.value);
+  if (a && opt) opt.text = arrangeLabel(a);
+}
+scenarioSel.addEventListener('change', loadScenes);
+sceneSel.addEventListener('change', loadSamples);
+sampleSel.addEventListener('change', loadArrangements);
+arrangeSel.addEventListener('change', loadSceneNow);
+
+// extra-object browser (full library)
+async function loadMeta() {
+  const m = await (await fetch('/meta')).json();
+  const tag = document.getElementById('tag'), source = document.getElementById('source');
+  for (const t of m.tags) tag.add(new Option(t, t));
+  for (const s of m.sources) source.add(new Option(s, s));
+}
+async function loadAssets() {
+  const q = new URLSearchParams({
+    search: document.getElementById('search').value,
+    tag: document.getElementById('tag').value,
+    source: document.getElementById('source').value,
+  });
+  const list = await (await fetch('/assets?' + q)).json();
+  document.getElementById('count').textContent = `${list.length} assets`;
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for (const a of list) {
+    const cell = document.createElement('div');
+    cell.className = 'cell'; cell.draggable = true; cell.title = `${a.label || a.id}\n${a.id}`;
+    cell.addEventListener('dragstart', () => { dragPayload = { asset_id: a.id }; });
+    const im = document.createElement('img');
+    im.loading = 'lazy'; im.src = '/preview?asset_id=' + encodeURIComponent(a.id);
+    cell.appendChild(im);
+    const label = document.createElement('div');
+    label.className = 'cell-label';
+    label.textContent = a.label || a.id;
+    cell.appendChild(label);
+    grid.appendChild(cell);
+  }
+}
+let timer;
+document.getElementById('search').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(loadAssets, 250); });
+document.getElementById('tag').addEventListener('change', loadAssets);
+document.getElementById('source').addEventListener('change', loadAssets);
+
+// background controls (table/wall texture pickers + randomize)
+let bgEcho = false;  // ignore the state echo right after we set the dropdowns
+function reflectBg(bg) {
+  if (bgEcho) { bgEcho = false; return; }
+  document.getElementById('bgTable').value = bg.table_texture || '';
+  document.getElementById('bgWall').value = bg.wall_texture || '';
+}
+async function loadTextures() {
+  const t = await (await fetch('/textures')).json();
+  const tbl = document.getElementById('bgTable'), wall = document.getElementById('bgWall');
+  for (const id of t.table) tbl.add(new Option(id, id));
+  for (const id of t.wall) wall.add(new Option(id, id));
+}
+document.getElementById('bgApply').addEventListener('click', () => {
+  bgEcho = true;
+  send({ type: 'set_bg', table_texture: document.getElementById('bgTable').value,
+         wall_texture: document.getElementById('bgWall').value });
+});
+document.getElementById('bgRandom').addEventListener('click', () => send({ type: 'randomize_bg' }));
+
+// init: HTTP fetches now; ws-dependent loads once the socket opens
+loadMeta();
+loadAssets();
+ws.addEventListener('open', () => { loadTextures(); loadScenarios(); });
+</script>
+</body>
+</html>
