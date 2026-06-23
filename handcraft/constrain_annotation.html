@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>constraint annotation</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; background: #15161a; color: #dde1e8;
+         font-family: ui-sans-serif, system-ui, sans-serif; display: flex; overflow: hidden; }
+  button, input, select { font: inherit; }
+  #left { width: 330px; background: #1d2027; border-right: 1px solid #303640; display: flex; flex-direction: column; }
+  #center { flex: 1; min-width: 0; background: #0c0d10; display: flex; flex-direction: column; }
+  #right { width: 420px; background: #1d2027; border-left: 1px solid #303640; display: flex; flex-direction: column; }
+  .bar { padding: 10px; display: grid; gap: 7px; border-bottom: 1px solid #303640; background: #20242b; }
+  .row { display: flex; gap: 7px; align-items: center; }
+  label { color: #9aa3b2; font-size: 12px; }
+  select, input { min-width: 0; background: #11141a; color: #dde1e8; border: 1px solid #3a414d; border-radius: 4px; padding: 7px; }
+  button { border: none; border-radius: 4px; padding: 7px 10px; color: #fff; background: #3d526f; cursor: pointer; }
+  button:hover { background: #496381; }
+  button.danger { background: #633a36; }
+  button.danger:hover { background: #7a453f; }
+  #status { min-height: 18px; color: #91c4a7; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  #categories { overflow: auto; padding: 10px; }
+  .category { margin-bottom: 10px; border: 1px solid #303640; border-radius: 6px; overflow: hidden; background: #171a20; }
+  .category-head { display: flex; align-items: center; gap: 8px; background: #252a33; padding: 8px; }
+  .category-head span { flex: 1; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .category-head button { width: 30px; height: 28px; padding: 0; font-size: 18px; line-height: 26px; }
+  .object-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
+                padding: 7px; border-top: 1px solid #2b313b; cursor: pointer; }
+  .object-row:hover { background: #222832; }
+  .object-row.selected { background: #33415c; }
+  .object-row img { width: 48px; height: 48px; object-fit: cover; background: #0c0e12; border-radius: 4px; }
+  .obj-main { min-width: 0; }
+  .obj-title { font-size: 12px; color: #eef1f6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .obj-sub { font-size: 11px; color: #8f98a8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dots { display: flex; gap: 4px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid #6e7787; background: transparent; }
+  .dot.on { background: #3bd26f; border-color: #3bd26f; box-shadow: 0 0 6px rgba(59,210,111,0.45); }
+  .object-row .danger { width: 24px; height: 24px; padding: 0; }
+
+  #topbar { display: flex; gap: 8px; align-items: center; padding: 10px; background: #20242b; border-bottom: 1px solid #303640; }
+  #topbar input { width: 170px; }
+  #randomize { margin-left: auto; }
+  #stage { position: relative; flex: 1; display: flex; min-height: 0; }
+  #scene { margin: auto; max-width: 100%; max-height: 100%; cursor: crosshair; }
+  #selectBox { position: absolute; border: 1px solid #f3d75c; background: rgba(243,215,92,0.14); pointer-events: none; display: none; }
+  #hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+          max-width: min(760px, 72%); text-align: center; font-size: 13px; color: #cbd3df;
+          background: rgba(20,22,28,0.78); border: 1px solid rgba(142,151,166,0.22);
+          padding: 7px 12px; border-radius: 5px; }
+  #hint.hot { color: #f1d36f; background: rgba(20,22,28,0.9); border-color: rgba(241,211,111,0.45); }
+  #menu { position: fixed; z-index: 20; display: none; min-width: 230px; background: #252a33; border: 1px solid #3a414d;
+          border-radius: 6px; padding: 6px; box-shadow: 0 12px 30px rgba(0,0,0,0.35); }
+  #menu button { display: block; width: 100%; margin: 3px 0; text-align: left; background: #303848; }
+  #menu button:hover { background: #3d4a61; }
+
+  #relations { overflow: auto; padding: 10px; }
+  .rel { border: 1px solid #303640; border-radius: 6px; background: #171a20; margin-bottom: 8px; overflow: hidden; }
+  .rel.incomplete { border-color: #4388d6; background: #151d2a; }
+  .rel.error { border-color: #a64a40; background: #241918; }
+  .rel-head { display: flex; align-items: center; gap: 8px; padding: 8px; cursor: pointer; background: #252a33; }
+  .rel.incomplete .rel-head { background: #203049; }
+  .rel.error .rel-head { background: #3a2421; }
+  .rel-title { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rel-body { display: none; padding: 8px; border-top: 1px solid #303640; }
+  .rel.open .rel-body { display: block; }
+  .kv { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 6px; align-items: center; margin-bottom: 6px; }
+  .kv span { color: #9aa3b2; font-size: 12px; }
+  .pick-row { display: grid; grid-template-columns: minmax(0, 1fr) 34px; gap: 5px; }
+  .pick-row button { padding: 0; }
+  .object-ref { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 7px; align-items: center;
+                font-size: 12px; color: #dde1e8; background: #11141a; border-radius: 4px; padding: 5px 6px; margin-bottom: 4px;
+                overflow-wrap: anywhere; }
+  .ref-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 20px;
+               border-radius: 3px; background: #3d526f; color: #fff; font-weight: 700; font-size: 12px; }
+  .ref-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .err { color: #e09a8d; font-size: 12px; margin-top: 7px; overflow-wrap: anywhere; }
+  .info { color: #89bfff; font-size: 12px; margin-top: 7px; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+  <aside id="left">
+    <div class="bar">
+      <div class="row"><label>Scenario</label><select id="scenario"></select></div>
+      <div class="row"><label>Variation</label><select id="variation"></select></div>
+      <button id="loadVariation">Load Variation</button>
+      <div id="status"></div>
+    </div>
+    <div id="categories"></div>
+  </aside>
+
+  <main id="center">
+    <div id="topbar">
+      <label>Template</label>
+      <select id="templateList"><option value="">load saved...</option></select>
+      <button id="newTemplate">New</button>
+      <button id="loadTemplate">Load</button>
+      <button id="saveTemplate">Save</button>
+      <button id="randomize">Randomize</button>
+    </div>
+    <div id="stage">
+      <canvas id="scene" width="1024" height="768"></canvas>
+      <div id="selectBox"></div>
+      <div id="hint">drag left image onto table · click select · drag box select · right-click selected object(s) to add relation</div>
+      <div id="menu"></div>
+    </div>
+  </main>
+
+  <aside id="right">
+    <div class="bar">
+      <div class="row"><b>Relations</b><button id="refresh" style="margin-left:auto">Reapply</button></div>
+    </div>
+    <div id="relations"></div>
+  </aside>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const canvas = $('scene');
+const ctx = canvas.getContext('2d');
+const img = new Image();
+img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+const ws = new WebSocket((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws');
+const send = (m) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); };
+
+let meta = [];
+let state = null;
+let expanded = null;
+let boxSelect = null;
+let suppressClick = false;
+let dragKey = null;
+let pendingRefPick = null;
+const DEFAULT_HINT = 'drag left image onto table · click select · drag box select · right-click selected object(s) to add relation';
+const LOCAL_IDS = 'abcdefghijklmnopqrstuvwxyz';
+
+function setStatus(text, error = false) {
+  $('status').textContent = text;
+  $('status').style.color = error ? '#e09a8d' : '#91c4a7';
+}
+function setHint(text) {
+  $('hint').textContent = text || DEFAULT_HINT;
+  $('hint').classList.toggle('hot', Boolean(text));
+}
+
+ws.onmessage = (ev) => {
+  const msg = JSON.parse(ev.data);
+  if (msg.type === 'error') { setStatus(msg.message, true); return; }
+  if (msg.type === 'saved') { setStatus('saved ' + msg.path); return; }
+  if (msg.type === 'new_template') { setStatus('new ' + msg.path); return; }
+  if (msg.type === 'randomized') { setStatus('randomized sets'); return; }
+  if (msg.type !== 'frame') return;
+  img.src = 'data:image/jpeg;base64,' + msg.image;
+  state = msg.state;
+  renderTemplateList();
+  renderCategories();
+  renderRelations();
+};
+
+function renderTemplateList() {
+  $('templateList').innerHTML = '<option value="">load saved...</option>';
+  for (const name of state.templates || []) $('templateList').add(new Option(name, name));
+  $('templateList').value = (state.templates || []).includes(state.template_name) ? state.template_name : '';
+}
+
+function renderCategories() {
+  const box = $('categories');
+  box.innerHTML = '';
+  for (const category of state.available_categories || []) {
+    const wrap = document.createElement('div');
+    wrap.className = 'category';
+    const head = document.createElement('div');
+    head.className = 'category-head';
+    const title = document.createElement('span');
+    title.textContent = category;
+    const add = document.createElement('button');
+    add.textContent = '+';
+    add.addEventListener('click', () => send({ type: 'add_set', category }));
+    head.append(title, add);
+    wrap.appendChild(head);
+    for (const obj of state.objects.filter((o) => o.ref.category === category)) {
+      wrap.appendChild(objectRow(obj));
+    }
+    box.appendChild(wrap);
+  }
+}
+
+function objectRow(obj) {
+  const row = document.createElement('div');
+  row.className = 'object-row' + (obj.selected ? ' selected' : '');
+  row.draggable = true;
+  row.addEventListener('dragstart', () => { dragKey = obj.key; });
+  row.addEventListener('dragend', () => { dragKey = null; });
+  row.addEventListener('click', () => {
+    if (obj.scene_id) send({ type: 'select', scene_id: obj.scene_id });
+  });
+  const im = document.createElement('img');
+  im.loading = 'lazy';
+  im.src = '/preview?asset_id=' + encodeURIComponent(obj.asset_id);
+  const main = document.createElement('div');
+  main.className = 'obj-main';
+  const title = document.createElement('div');
+  title.className = 'obj-title';
+  title.textContent = `${obj.ref.category}[${obj.ref.set}][${obj.ref.slot}]`;
+  const sub = document.createElement('div');
+  sub.className = 'obj-sub';
+  sub.textContent = obj.asset_id;
+  main.append(title, sub);
+  const dots = document.createElement('div');
+  dots.className = 'dots';
+  const placed = document.createElement('div');
+  placed.className = 'dot' + (obj.placed ? ' on' : '');
+  placed.title = 'placed';
+  dots.appendChild(placed);
+  for (const key of ['x', 'y', 'rotation']) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (obj.defined[key] ? ' on' : '');
+    dot.title = key;
+    dots.appendChild(dot);
+  }
+  const del = document.createElement('button');
+  del.className = 'danger';
+  del.textContent = '×';
+  del.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    send({ type: 'delete_object', key: obj.key });
+  });
+  row.append(im, main, dots, del);
+  return row;
+}
+
+function objectByRef(ref) {
+  return state.objects.find((o) =>
+    o.ref.category === ref.category && o.ref.set === ref.set && o.ref.slot === ref.slot
+  );
+}
+
+function refKey(ref) {
+  return `${ref.category}:${ref.set}:${ref.slot}`;
+}
+
+function refLabel(ref) {
+  return `${ref.category}[${ref.set}][${ref.slot}]`;
+}
+
+function localRefId(rel, ref) {
+  const refs = rel.objects || [];
+  const index = refs.findIndex((candidate) => refKey(candidate) === refKey(ref));
+  return index >= 0 ? LOCAL_IDS[index] : '';
+}
+
+function relationRefs(rel) {
+  const refs = [...(rel.objects || [])];
+  for (const name of ['target', 'anchor', 'holder']) if (rel[name]) refs.push(rel[name]);
+  for (const ref of rel.targets || []) refs.push(ref);
+  const seen = new Set();
+  return refs.filter((ref) => {
+    const key = `${ref.category}:${ref.set}:${ref.slot}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function relationSummary(rel) {
+  if (rel.type === 'evenly_spaced_from_anchor' && rel.order) return `${rel.type}(${rel.order})`;
+  return `${rel.type}(${relationRefs(rel).map(refLabel).join(', ')})`;
+}
+
+function orderText(rel) {
+  return rel.order || '';
+}
+
+function renderRelations() {
+  const box = $('relations');
+  box.innerHTML = '';
+  state.constraints.forEach((rel, index) => {
+    const card = document.createElement('div');
+    card.className = 'rel'
+      + (state.relation_errors[index] ? ' error' : '')
+      + (state.relation_incomplete[index] ? ' incomplete' : '')
+      + (expanded === index ? ' open' : '');
+    const head = document.createElement('div');
+    head.className = 'rel-head';
+    head.addEventListener('click', () => { expanded = expanded === index ? null : index; renderRelations(); });
+    const title = document.createElement('div');
+    title.className = 'rel-title';
+    title.textContent = relationSummary(rel);
+    const del = document.createElement('button');
+    del.className = 'danger';
+    del.textContent = '×';
+    del.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      send({ type: 'delete_relation', index });
+    });
+    head.append(title, del);
+    const body = document.createElement('div');
+    body.className = 'rel-body';
+    body.appendChild(refBlock(rel));
+    body.appendChild(paramBlock(rel, index));
+    if (state.relation_incomplete[index]) {
+      const info = document.createElement('div');
+      info.className = 'info';
+      info.textContent = state.relation_incomplete[index];
+      body.appendChild(info);
+    }
+    if (state.relation_errors[index]) {
+      const err = document.createElement('div');
+      err.className = 'err';
+      err.textContent = state.relation_errors[index];
+      body.appendChild(err);
+    }
+    card.append(head, body);
+    box.appendChild(card);
+  });
+}
+
+function refBlock(rel) {
+  const box = document.createElement('div');
+  relationRefs(rel).forEach((ref) => {
+    const line = document.createElement('div');
+    line.className = 'object-ref';
+    const badge = document.createElement('span');
+    badge.className = 'ref-badge';
+    badge.textContent = rel.type === 'evenly_spaced_from_anchor' ? localRefId(rel, ref) : '';
+    const text = document.createElement('span');
+    text.className = 'ref-text';
+    text.textContent = refLabel(ref);
+    line.append(badge, text);
+    box.appendChild(line);
+  });
+  return box;
+}
+
+function paramBlock(rel, index) {
+  const box = document.createElement('div');
+  const addNumber = (name, defaultValue = '') => {
+    const line = document.createElement('div');
+    line.className = 'kv';
+    const label = document.createElement('span');
+    label.textContent = name;
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.step = '0.01';
+    input.value = rel[name] ?? defaultValue;
+    input.addEventListener('change', () => {
+      const next = { ...rel };
+      if (input.value === '') delete next[name];
+      else next[name] = Number(input.value);
+      updateRel(index, next);
+    });
+    line.append(label, input);
+    box.appendChild(line);
+  };
+  const addRefSelect = (name) => {
+    const line = document.createElement('div');
+    line.className = 'kv';
+    const label = document.createElement('span');
+    label.textContent = name;
+    const picker = document.createElement('div');
+    picker.className = 'pick-row';
+    const select = document.createElement('select');
+    select.add(new Option('choose...', ''));
+    const refs = relationRefs(rel);
+    for (const ref of refs) {
+      const key = refKey(ref);
+      const prefix = rel.type === 'evenly_spaced_from_anchor' ? `${localRefId(rel, ref)}. ` : '';
+      select.add(new Option(prefix + refLabel(ref), key));
+    }
+    select.value = rel[name] ? refKey(rel[name]) : '';
+    select.addEventListener('change', () => {
+      const next = { ...rel };
+      const found = refs.find((ref) => refKey(ref) === select.value);
+      if (found) next[name] = found;
+      else delete next[name];
+      updateRel(index, next);
+    });
+    const pick = document.createElement('button');
+    pick.textContent = '⌖';
+    pick.title = `pick ${name} in scene`;
+    pick.addEventListener('click', () => {
+      pendingRefPick = { index, field: name };
+      setHint(`${rel.type}: click an object to set ${name}. Press Escape to cancel.`);
+    });
+    picker.append(select, pick);
+    line.append(label, picker);
+    box.appendChild(line);
+  };
+  const addAxis = () => {
+    const line = document.createElement('div');
+    line.className = 'kv';
+    const label = document.createElement('span');
+    label.textContent = 'axis';
+    const select = document.createElement('select');
+    select.add(new Option('choose...', ''));
+    for (const v of ['x', 'y']) select.add(new Option(v, v));
+    select.value = rel.axis || '';
+    select.addEventListener('change', () => {
+      const next = { ...rel };
+      if (select.value) next.axis = select.value;
+      else delete next.axis;
+      updateRel(index, next);
+    });
+    line.append(label, select);
+    box.appendChild(line);
+  };
+  const addMode = () => {
+    const line = document.createElement('div');
+    line.className = 'kv';
+    const label = document.createElement('span');
+    label.textContent = 'mode';
+    const select = document.createElement('select');
+    select.add(new Option('choose...', ''));
+    for (const v of ['obj_center', 'footprint']) select.add(new Option(v, v));
+    select.value = rel.mode || '';
+    select.addEventListener('change', () => {
+      const next = { ...rel };
+      if (select.value) next.mode = select.value;
+      else delete next.mode;
+      updateRel(index, next);
+    });
+    line.append(label, select);
+    box.appendChild(line);
+  };
+  const addOrder = () => {
+    const line = document.createElement('div');
+    line.className = 'kv';
+    const label = document.createElement('span');
+    label.textContent = 'order';
+    const input = document.createElement('input');
+    input.value = orderText(rel);
+    input.placeholder = 'acbd';
+    input.addEventListener('change', () => updateRel(index, { ...rel, order: input.value }));
+    line.append(label, input);
+    box.appendChild(line);
+  };
+  const addAlignAxis = () => {
+    const line = document.createElement('div');
+    line.className = 'kv';
+    const label = document.createElement('span');
+    label.textContent = 'axis';
+    const select = document.createElement('select');
+    for (const v of ['horizontal', 'vertical', 'any', 'custom']) select.add(new Option(v, v));
+    select.value = rel.axis || 'horizontal';
+    select.addEventListener('change', () => updateRel(index, { ...rel, axis: select.value }));
+    line.append(label, select);
+    box.appendChild(line);
+  };
+  if (['table_x', 'table_xy'].includes(rel.type)) addNumber('x');
+  if (['table_y', 'table_xy'].includes(rel.type)) addNumber('y');
+  if (['table_x', 'table_xy'].includes(rel.type)) addNumber('x_jitter', 0);
+  if (['table_y', 'table_xy'].includes(rel.type)) addNumber('y_jitter', 0);
+  if (rel.type === 'align_axis') { addAlignAxis(); addNumber('yaw_deg'); addNumber('jitter_deg'); }
+  if (['in_same_vertical_line', 'in_same_horizontal_line', 'evenly_spaced_from_anchor', 'x_offset_from', 'y_offset_from', 'xy_offset_from'].includes(rel.type)) addRefSelect('anchor');
+  if (rel.type === 'pen_in_holder') addRefSelect('holder');
+  if (rel.type === 'evenly_spaced_from_anchor') { addAxis(); addMode(); addOrder(); addNumber('spacing'); addNumber('spacing_jitter', 0); }
+  if (['x_offset_from', 'xy_offset_from'].includes(rel.type)) addNumber('dx');
+  if (['y_offset_from', 'xy_offset_from'].includes(rel.type)) addNumber('dy');
+  if (['x_offset_from', 'xy_offset_from'].includes(rel.type)) addNumber('dx_jitter', 0);
+  if (['y_offset_from', 'xy_offset_from'].includes(rel.type)) addNumber('dy_jitter', 0);
+  if (!box.children.length) {
+    const line = document.createElement('div');
+    line.className = 'err';
+    line.textContent = 'no editable parameters';
+    box.appendChild(line);
+  }
+  return box;
+}
+
+function updateRel(index, rel) {
+  send({ type: 'update_relation', index, relation: rel });
+}
+
+function toImage(ev) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: Math.round((ev.clientX - r.left) * (canvas.width / r.width)),
+    y: Math.round((ev.clientY - r.top) * (canvas.height / r.height))
+  };
+}
+
+function canvasPoint(ev) {
+  const r = canvas.getBoundingClientRect();
+  return { x: ev.clientX - r.left, y: ev.clientY - r.top, rect: r };
+}
+
+const selectBox = $('selectBox');
+function drawSelectBox(a, b, rect) {
+  const stageRect = $('stage').getBoundingClientRect();
+  selectBox.style.left = Math.min(a.x, b.x) + rect.left - stageRect.left + 'px';
+  selectBox.style.top = Math.min(a.y, b.y) + rect.top - stageRect.top + 'px';
+  selectBox.style.width = Math.abs(a.x - b.x) + 'px';
+  selectBox.style.height = Math.abs(a.y - b.y) + 'px';
+  selectBox.style.display = 'block';
+}
+
+canvas.addEventListener('mousedown', (ev) => {
+  if (ev.button !== 0) return;
+  if (pendingRefPick) return;
+  ev.preventDefault();
+  hideMenu();
+  const p = canvasPoint(ev);
+  boxSelect = { start: p, current: p };
+  drawSelectBox(p, p, p.rect);
+});
+canvas.addEventListener('mousemove', (ev) => {
+  if (!boxSelect) return;
+  ev.preventDefault();
+  const p = canvasPoint(ev);
+  boxSelect.current = p;
+  drawSelectBox(boxSelect.start, p, p.rect);
+});
+document.addEventListener('mouseup', (ev) => {
+  if (!boxSelect) return;
+  ev.preventDefault();
+  const start = boxSelect.start;
+  const end = boxSelect.current;
+  selectBox.style.display = 'none';
+  boxSelect = null;
+  if (Math.abs(start.x - end.x) < 4 && Math.abs(start.y - end.y) < 4) return;
+  suppressClick = true;
+  const r = canvas.getBoundingClientRect();
+  send({
+    type: 'select_rect',
+    x0: Math.round(start.x * (canvas.width / r.width)),
+    y0: Math.round(start.y * (canvas.height / r.height)),
+    x1: Math.round(end.x * (canvas.width / r.width)),
+    y1: Math.round(end.y * (canvas.height / r.height))
+  });
+});
+canvas.addEventListener('click', (ev) => {
+  if (suppressClick) { suppressClick = false; return; }
+  hideMenu();
+  const p = toImage(ev);
+  if (pendingRefPick) {
+    send({ type: 'pick_relation_ref', index: pendingRefPick.index, field: pendingRefPick.field, x: p.x, y: p.y });
+    pendingRefPick = null;
+    setHint(null);
+    return;
+  }
+  send({ type: 'select_at', x: p.x, y: p.y });
+});
+canvas.addEventListener('contextmenu', (ev) => {
+  ev.preventDefault();
+  showMenu(ev.clientX, ev.clientY);
+});
+canvas.addEventListener('dragover', (ev) => ev.preventDefault());
+canvas.addEventListener('drop', (ev) => {
+  ev.preventDefault();
+  if (!dragKey) return;
+  const p = toImage(ev);
+  send({ type: 'place_object', key: dragKey, x: p.x, y: p.y });
+  dragKey = null;
+});
+document.addEventListener('keydown', (ev) => {
+  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(ev.target.tagName)) return;
+  if (ev.key === 'Escape' && pendingRefPick) {
+    pendingRefPick = null;
+    setHint(null);
+    ev.preventDefault();
+    return;
+  }
+  const k = ev.key.toLowerCase();
+  if (!'wasdqe'.includes(k)) return;
+  send({ type: 'key', name: k, fine: ev.shiftKey, relation_index: expanded });
+  ev.preventDefault();
+});
+document.addEventListener('click', (ev) => {
+  if (!$('menu').contains(ev.target)) hideMenu();
+});
+
+function validRelations() {
+  const n = (state.selected_keys || []).length;
+  const out = [];
+  if (n === 1) out.push('table_x', 'table_y', 'table_xy', 'align_axis');
+  if (n >= 2) out.push('in_same_vertical_line', 'in_same_horizontal_line', 'evenly_spaced_from_anchor');
+  if (n === 2) out.push('x_offset_from', 'y_offset_from', 'xy_offset_from', 'pen_in_holder');
+  return out;
+}
+
+function showMenu(x, y) {
+  const menu = $('menu');
+  menu.innerHTML = '';
+  const rels = validRelations();
+  if (!rels.length) {
+    const b = document.createElement('button');
+    b.textContent = 'select object(s) first';
+    b.disabled = true;
+    menu.appendChild(b);
+  } else {
+    for (const rel of rels) {
+      const b = document.createElement('button');
+      b.textContent = rel;
+      b.addEventListener('click', () => {
+        hideMenu();
+        send({ type: 'add_relation', relation: rel });
+      });
+      menu.appendChild(b);
+    }
+  }
+  menu.style.left = Math.min(x, window.innerWidth - 250) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - 260) + 'px';
+  menu.style.display = 'block';
+}
+function hideMenu() { $('menu').style.display = 'none'; }
+
+async function loadMeta() {
+  const data = await (await fetch('/meta')).json();
+  meta = data.scenarios;
+  $('scenario').innerHTML = '';
+  for (const s of meta) $('scenario').add(new Option(s.scenario, s.scenario));
+  if ([...$('scenario').options].some((o) => o.value === 'dining_table')) $('scenario').value = 'dining_table';
+  renderVariations();
+}
+
+function renderVariations() {
+  const found = meta.find((s) => s.scenario === $('scenario').value);
+  $('variation').innerHTML = '';
+  for (const v of (found ? found.variations : [])) $('variation').add(new Option(v, v));
+  if ([...$('variation').options].some((o) => o.value === 'after_meal_cleanup')) $('variation').value = 'after_meal_cleanup';
+}
+
+$('scenario').addEventListener('change', renderVariations);
+$('loadVariation').addEventListener('click', () => {
+  send({ type: 'load_variation', scenario: $('scenario').value, variation: $('variation').value });
+});
+$('loadTemplate').addEventListener('click', () => {
+  if ($('templateList').value) send({ type: 'load_template', name: $('templateList').value });
+});
+$('saveTemplate').addEventListener('click', () => {
+  if ($('templateList').value) send({ type: 'save_template', name: $('templateList').value });
+});
+$('newTemplate').addEventListener('click', () => {
+  const name = prompt('New template name');
+  if (name) send({ type: 'new_template', name });
+});
+$('randomize').addEventListener('click', () => send({ type: 'randomize' }));
+$('refresh').addEventListener('click', () => send({ type: 'reapply' }));
+
+loadMeta();
+</script>
+</body>
+</html>
