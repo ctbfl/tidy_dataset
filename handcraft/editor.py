@@ -23,6 +23,7 @@ SETTLE_STEPS = 400           # max physics sub-steps when dropping an object to 
 SETTLE_REST_V = 1e-3         # m/s below which the falling object counts as settled
 SETTLE_DROP_CLEARANCE = 0.02
 OUTLINE_COLOR = (255, 220, 0)
+RELATION_OUTLINE_COLOR = (80, 170, 255)
 
 
 def _world_aabb(entity) -> np.ndarray:
@@ -62,6 +63,7 @@ class SceneEditor:
         self.camera = add_camera(self.scene_wrap, width=camera_width, height=camera_height)
         self.selected: str | None = None
         self.selected_ids: set[str] = set()
+        self.extra_outline_colors: dict[str, tuple[int, int, int]] = {}
         self._seg = self._pos = self._model = None  # filled by render()
         self._counter = 0  # monotonic; gives every spawn a unique scene id
         # scenario annotation state (set by load_scene_dict)
@@ -86,15 +88,24 @@ class SceneEditor:
         self._seg = self.camera.get_picture("Segmentation")[..., 1]
         self._pos = self.camera.get_picture("Position")
         self._model = np.asarray(self.camera.get_model_matrix())
+        outline_colors = dict(self.extra_outline_colors)
         for sid in self.selected_ids:
+            outline_colors[sid] = OUTLINE_COLOR
+        for sid, color in outline_colors.items():
             if sid not in self.objects:
                 continue
             psid = self.objects[sid].entity.per_scene_id
             mask = (self._seg == psid).astype(np.uint8)
             if mask.any():
                 edge = cv2.dilate(mask, np.ones((5, 5), np.uint8)) - cv2.erode(mask, np.ones((3, 3), np.uint8))
-                rgb[edge > 0] = OUTLINE_COLOR
+                rgb[edge > 0] = color
         return rgb
+
+    def set_extra_outlines(self, colors: dict[str, tuple[int, int, int]]) -> None:
+        self.extra_outline_colors = dict(colors)
+
+    def clear_extra_outlines(self) -> None:
+        self.extra_outline_colors.clear()
 
     def _world_point(self, x: int, y: int):
         view = self._pos[y, x]
@@ -259,10 +270,10 @@ class SceneEditor:
         if body is None:  # articulation/URDF link: leave its pose untouched
             return
         floor = self.scene_wrap.table["height"]            # table top: a hard lower bound
-        if _uses_nonconvex_collision(obj):
-            self._rest_on_table(obj, floor)
-            return
         support_top = self._support_top(obj)
+        if _uses_nonconvex_collision(obj):
+            self._rest_on_height(obj, support_top)
+            return
         bottom = _world_aabb_min_z(obj.entity)
         if bottom < support_top + SETTLE_DROP_CLEARANCE:
             pose = obj.entity.get_pose()
@@ -289,10 +300,10 @@ class SceneEditor:
             obj.entity.set_pose(sapien.Pose([p.p[0], p.p[1], p.p[2] + floor - bottom], p.q))
         self.scene.update_render()
 
-    def _rest_on_table(self, obj, floor: float) -> None:
+    def _rest_on_height(self, obj, z: float) -> None:
         bottom = _world_aabb_min_z(obj.entity)
         p = obj.entity.get_pose()
-        obj.entity.set_pose(sapien.Pose([p.p[0], p.p[1], p.p[2] + floor - bottom], p.q))
+        obj.entity.set_pose(sapien.Pose([p.p[0], p.p[1], p.p[2] + z - bottom], p.q))
         self.scene.update_render()
 
     def _support_top(self, obj) -> float:

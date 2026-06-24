@@ -336,7 +336,11 @@ function renderRelations() {
       + (expanded === index ? ' open' : '');
     const head = document.createElement('div');
     head.className = 'rel-head';
-    head.addEventListener('click', () => { expanded = expanded === index ? null : index; renderRelations(); });
+    head.addEventListener('click', () => {
+      expanded = expanded === index ? null : index;
+      send({ type: 'highlight_relation', mode: relationMode, index });
+      renderRelations();
+    });
     const title = document.createElement('div');
     title.className = 'rel-title';
     title.textContent = relationSummary(rel);

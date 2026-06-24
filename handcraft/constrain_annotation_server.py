@@ -20,7 +20,7 @@ SIMULATIONS_DIR = HERE.parent / "simulations"
 if str(SIMULATIONS_DIR) not in sys.path:
     sys.path.insert(0, str(SIMULATIONS_DIR))
 
-from editor import SceneEditor, _world_aabb  # noqa: E402
+from editor import OUTLINE_COLOR, RELATION_OUTLINE_COLOR, SceneEditor, _world_aabb  # noqa: E402
 from objects import Asset, spawn  # noqa: E402
 from preview import PreviewRenderer  # noqa: E402
 from scene import LIBRARY  # noqa: E402
@@ -729,6 +729,7 @@ class ConstraintStudio:
         return str(int(round(yaw / 90.0) * 90) % 360)
 
     def select_scene_id(self, scene_id: str | None) -> None:
+        self.clear_highlight()
         key = self.key_by_scene_id.get(scene_id or "")
         self.selected_keys = {key} if key else set()
         self._sync_selection()
@@ -738,6 +739,7 @@ class ConstraintStudio:
         self.select_scene_id(self.editor.selected)
 
     def select_rect(self, x0: int, y0: int, x1: int, y1: int) -> None:
+        self.clear_highlight()
         self.editor.select_rect(x0, y0, x1, y1)
         self.selected_keys = {self.key_by_scene_id[sid] for sid in self.editor.selected_ids if sid in self.key_by_scene_id}
         self._sync_selection()
@@ -745,6 +747,47 @@ class ConstraintStudio:
     def _sync_selection(self) -> None:
         self.editor.selected_ids = {self.scene_ids[k] for k in self.selected_keys if k in self.scene_ids}
         self.editor.selected = next(iter(self.editor.selected_ids), None)
+
+    def clear_highlight(self) -> None:
+        self.editor.clear_extra_outlines()
+
+    def highlight_relation(self, index: int, mode: str = "layout") -> None:
+        self.clear_highlight()
+        self.selected_keys.clear()
+        self._sync_selection()
+        blue_keys: set[str] = set()
+        yellow_keys: set[str] = set()
+        if mode == "layout":
+            relation = self.constraints[index]
+            keys = self._relation_keys(relation)
+            anchor = relation.get("anchor")
+            anchor_key = _ref_key(anchor) if anchor else None
+            yellow_keys = {anchor_key} if anchor_key else set()
+            blue_keys = keys - yellow_keys
+        elif mode == "selection":
+            relation = self.selection_constraints[index]
+            if relation["type"] == "same_entry":
+                refs = [
+                    record["ref"] for record in self._object_records()
+                    if record["ref"]["category"] == relation["category"]
+                    and record["ref"]["set"] in relation["sets"]
+                ]
+                blue_keys = {_ref_key(ref) for ref in refs}
+            else:
+                blue_keys = self._relation_keys(relation)
+        else:
+            raise ValueError(f"unknown relation mode: {mode}")
+        colors = {
+            self.scene_ids[key]: RELATION_OUTLINE_COLOR
+            for key in blue_keys
+            if key in self.scene_ids
+        }
+        colors.update({
+            self.scene_ids[key]: OUTLINE_COLOR
+            for key in yellow_keys
+            if key in self.scene_ids
+        })
+        self.editor.set_extra_outlines(colors)
 
     def add_relation(self, relation_type: str) -> None:
         refs = [self._ref_from_key(k) for k in self._stable_keys(self.selected_keys)]
@@ -1646,6 +1689,8 @@ async def ws(socket: WebSocket):
                         studio.delete_relation(int(msg["index"]))
                     elif kind == "delete_selection_relation":
                         studio.delete_selection_relation(int(msg["index"]))
+                    elif kind == "highlight_relation":
+                        studio.highlight_relation(int(msg["index"]), msg.get("mode", "layout"))
                     elif kind == "reapply":
                         studio.apply_constraints()
                     elif kind == "key":
