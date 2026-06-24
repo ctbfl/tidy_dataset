@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Render a tidy scene and write the organize_it pipeline's *input capture contract*.
 
+V2 uses the handcraft editor camera pose and fovy, at 1280x720, while keeping
+the same output contract filenames as ``render_organize_it_scene.py``.
+
 Two reference contracts, used deliberately:
 
 1. Camera capture files (``current.png`` / ``current_depth.pkl`` /
@@ -29,8 +32,8 @@ with ours (RoboTwin convention, table top z=0.74), so absolute origin is moot
 
 Usage
 -----
-    python tools/render_organize_it_scene.py <scene_dir>            # dir holding scene.json
-    python tools/render_organize_it_scene.py <scene_dir> --v0 path/to/v0.json
+    python tools/render_organize_it_scene_v2.py <scene_dir>            # dir holding scene.json
+    python tools/render_organize_it_scene_v2.py <scene_dir> --v0 path/to/v0.json
 """
 from __future__ import annotations
 
@@ -53,6 +56,11 @@ REF_DIR = ORGANIZE_IT_ROOT / "experiments" / "pybullet_ur5_test_simple"
 REF_SCRIPT = REF_DIR / "collect_asset_library_camera_scene_sample.py"
 DEFAULT_CATALOG = ORGANIZE_IT_ROOT / "data" / "asset_library" / "catalog.json"
 DEFAULT_CALIBRATION = REF_DIR / "camera_adjust_step15_calibration.json"
+HANDCRAFT_WIDTH = 1280
+HANDCRAFT_HEIGHT = 720
+HANDCRAFT_FOVY = 0.63
+HANDCRAFT_EYE = (0.0, -0.85, 1.6)
+HANDCRAFT_TARGET = (0.0, 0.0, 0.74)
 
 
 def load_reference_module():
@@ -101,6 +109,32 @@ def build_scene_with_tidy_loader(v0: dict, table_texture_id: str | None):
              for it in v0.get("items", [])]
     tidy_scene.load_items(ts, items)
     return ts
+
+
+def handcraft_camera_info() -> dict:
+    fy = 0.5 * HANDCRAFT_HEIGHT / math.tan(0.5 * HANDCRAFT_FOVY)
+    return {
+        "width": HANDCRAFT_WIDTH,
+        "height": HANDCRAFT_HEIGHT,
+        "fov_vertical_deg": math.degrees(HANDCRAFT_FOVY),
+        "fx": fy,
+        "fy": fy,
+        "cx": HANDCRAFT_WIDTH / 2.0,
+        "cy": HANDCRAFT_HEIGHT / 2.0,
+    }
+
+
+def add_handcraft_camera(ts, near: float, far: float, name: str):
+    if str(SIM_DIR) not in sys.path:
+        sys.path.insert(0, str(SIM_DIR))
+    import scene as tidy_scene  # simulations/scene.py
+
+    camera = tidy_scene.add_camera(
+        ts, width=HANDCRAFT_WIDTH, height=HANDCRAFT_HEIGHT,
+        eye=HANDCRAFT_EYE, target=HANDCRAFT_TARGET, fovy=HANDCRAFT_FOVY,
+    )
+    T_world_from_cam = tidy_scene.look_at(HANDCRAFT_EYE, HANDCRAFT_TARGET).to_transformation_matrix()
+    return camera, np.asarray(T_world_from_cam, dtype=np.float64)
 
 
 def add_calibrated_camera(mod, ts, camera_info: dict, near: float, far: float, name: str):
@@ -169,7 +203,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--settle-steps", type=int, default=0,
                    help="Physics steps before capture. 0 (default) preserves the handcrafted arrangement.")
     p.add_argument("--asset-catalog", type=Path, default=DEFAULT_CATALOG)
-    p.add_argument("--camera-calibration", type=Path, default=DEFAULT_CALIBRATION)
+    p.add_argument("--camera-calibration", type=Path, default=DEFAULT_CALIBRATION,
+                   help="Ignored by v2 handcraft-view rendering; accepted for CLI compatibility.")
     p.add_argument("--camera-name", default="wrist_camera")
     p.add_argument("--near-m", type=float, default=0.02)
     p.add_argument("--far-m", type=float, default=10.0)
@@ -190,21 +225,17 @@ def main() -> None:
     v0 = json.loads(v0_path.read_text())
 
     mod = load_reference_module()
-    calibration = mod.preview._load_robotwin_camera_calibration(args.camera_calibration.expanduser().resolve())
-    camera_info = calibration["camera"]
+    camera_info = handcraft_camera_info()
     if str(SIM_DIR) not in sys.path:
         sys.path.insert(0, str(SIM_DIR))
     import scene as tidy_scene  # simulations/scene.py
     from objects import asset_json_backup_dir  # noqa: E402
 
     overwrite_dir = asset_json_backup_dir(v0_path)
-    asset_registry = mod.AssetRegistry.load(
-        args.asset_catalog.expanduser().resolve(),
-        asset_json_overwrite_dir=overwrite_dir if overwrite_dir.is_dir() else None,
-    )
-    tidy_scene.LIBRARY.load_asset_json_backup(overwrite_dir)
+    asset_registry = mod.AssetRegistry.load(args.asset_catalog.expanduser().resolve())
+    tidy_scene.LIBRARY.load_asset_json_backup(None)
     ts = build_scene_with_tidy_loader(v0, v0.get("table_texture"))
-    camera, T_world_from_sapien_cam = add_calibrated_camera(mod, ts, camera_info, args.near_m, args.far_m, args.camera_name)
+    camera, T_world_from_sapien_cam = add_handcraft_camera(ts, args.near_m, args.far_m, args.camera_name)
     # Contract frame is table-centered (table top z=0): shift the SAPIEN-world camera pose
     # down by the table-top height so it matches the scene.json object poses and
     # generation.workspace_bounds_ur_base / tabletop_area.json. Pure z-translation.

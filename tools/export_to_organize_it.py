@@ -126,15 +126,9 @@ def _safe_entity_name(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", text).strip("_") or "asset"
 
 
-def load_asset_json_backup(v0_path: Path) -> dict[str, dict[str, Any]]:
-    backup_dir = v0_path.parent / ASSET_JSON_BACKUP_DIR
-    if not backup_dir.is_dir():
-        return {}
-    records = {}
-    for path in sorted(backup_dir.glob("*.json")):
-        record = json.loads(path.read_text())
-        records[record["asset_id"]] = record
-    return records
+def asset_json_overwrite_dir(v0_path: Path) -> Path | None:
+    path = v0_path.parent / ASSET_JSON_BACKUP_DIR
+    return path if path.is_dir() else None
 
 
 # --------------------------------------------------------------------------- #
@@ -178,13 +172,8 @@ def object_record(
     item: dict[str, Any],
     handle: AssetHandle,
     T_table_from_world: np.ndarray,
-    backup_records: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     record = handle.record
-    backup = backup_records.get(item["asset_id"], {})
-    geometry = backup.get("geometry", {})
-    physics = backup.get("physics", {})
-    stable_rotation = geometry.get("stable_rotation", record.geometry.stable_rotation)
     terms = record.source_specific_terms
     model_name = str(terms.get("model_name") or record.label or record.asset_id)
     model_id = str(terms.get("model_id") or terms.get("source_asset_id") or record.asset_id)
@@ -192,7 +181,7 @@ def object_record(
     # v0 transform is the object pose in its stable frame; organize_it wants the
     # raw-mesh world pose, which is stable_world @ stable_rotation.
     T_world_from_stable = np.asarray(item["transform"], dtype=np.float64).reshape(4, 4)
-    T_world_from_raw = T_world_from_stable @ stable_rotation_4x4(stable_rotation)
+    T_world_from_raw = T_world_from_stable @ stable_rotation_4x4(record.geometry.stable_rotation)
     T_table_from_raw = T_table_from_world @ T_world_from_raw
 
     # Primary pos/quat are in the table-centered frame (table top z=0): the pipeline's
@@ -202,17 +191,17 @@ def object_record(
         "item_id": f"obj:{index}",
         "name": _safe_entity_name(f"{model_name}_{model_id}_{index - 1}"),
         "asset_id": record.asset_id,
-        "label": backup.get("label", record.label),
-        "source": backup.get("source", record.source),
+        "label": record.label,
+        "source": record.source,
         "model_name": model_name,
         "model_id": model_id,
-        "model_type": backup.get("model_type", record.model_type),
-        "scale": [float(v) for v in geometry.get("scale", record.geometry.scale)],
-        "stable_rotation": [[float(v) for v in row] for row in stable_rotation],
-        "aabb_m": dict(geometry.get("aabb_m", record.geometry.aabb_m)),
+        "model_type": record.model_type,
+        "scale": [float(v) for v in record.geometry.scale],
+        "stable_rotation": [[float(v) for v in row] for row in record.geometry.stable_rotation],
+        "aabb_m": dict(record.geometry.aabb_m),
         "pos": [float(v) for v in T_table_from_raw[:3, 3].tolist()],
         "quat": quat_wxyz_from_matrix(T_table_from_raw[:3, :3]),
-        "mass": float(physics.get("mass", record.physics.mass)),
+        "mass": float(record.physics.mass),
         "pose_source": "handcraft_v0_stable_transform",
         "pose7_table": matrix_to_pose7_wxyz(T_table_from_raw),
         "pose7_sim_world": matrix_to_pose7_wxyz(T_world_from_raw),
@@ -250,13 +239,15 @@ def convert_scene(
     table = data["table"]
     table_texture = data.get("table_texture")  # curated PBR set id under assets/textures/table/, or None
     wall_texture = data.get("wall_texture")
-    backup_records = load_asset_json_backup(v0_path)
+    overwrite_dir = asset_json_overwrite_dir(v0_path)
+    if overwrite_dir is not None:
+        registry = AssetRegistry.load(catalog_path, asset_json_overwrite_dir=overwrite_dir)
 
     table_top_z = float(table["height"])  # table-top height in the handcraft/SAPIEN world
     T_table_from_world = table_from_world(table_top_z)
 
     objects = [
-        object_record(i, item, registry.get(item["asset_id"]), T_table_from_world, backup_records)
+        object_record(i, item, registry.get(item["asset_id"]), T_table_from_world)
         for i, item in enumerate(items, start=1)
     ]
 
