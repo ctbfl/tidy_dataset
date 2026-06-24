@@ -32,6 +32,9 @@ TRANS_FINE = 0.002
 YAW_STEP = np.radians(15)
 YAW_FINE = np.radians(5)
 LOCAL_IDS = "abcdefghijklmnopqrstuvwxyz"
+ALIGN_AXES = ("0", "90", "180", "270", "any", "custom")
+DELETE_RELATION = "delete_relation"
+KEEP_RELATION = "keep_relation"
 
 previews = PreviewRenderer()
 
@@ -96,6 +99,17 @@ def _clean_ref(ref: dict) -> dict:
     return {"category": str(ref["category"]), "set": int(ref["set"]), "slot": int(ref["slot"])}
 
 
+def _clean_set_ids(values) -> list[int]:
+    sets = [int(v) for v in values]
+    if len(set(sets)) != len(sets):
+        raise ValueError("same_entry sets must not contain duplicates")
+    return sets
+
+
+def _empty_fields() -> dict:
+    return {"x": None, "y": None, "rotation": None}
+
+
 class ConstraintStudio:
     def __init__(self):
         self.editor = SceneEditor(camera_width=1024, camera_height=768)
@@ -104,6 +118,8 @@ class ConstraintStudio:
         self.template_name = "draft"
         self.available = {}
         self.object_sets: list[dict] = []
+        self.sample_entry_index: dict[str, list[int]] = {}
+        self.selection_constraints: list[dict] = []
         self.constraints: list[dict] = []
         self.scene_ids: dict[str, str] = {}
         self.number_by_key: dict[str, int] = {}
@@ -111,6 +127,7 @@ class ConstraintStudio:
         self.placed_keys: set[str] = set()
         self.selected_keys: set[str] = set()
         self.fields: dict[str, dict] = {}
+        self.selection_errors: list[str | None] = []
         self.relation_errors: list[str | None] = []
         self.relation_incomplete: list[str | None] = []
         self._num = 0
@@ -122,6 +139,8 @@ class ConstraintStudio:
         self.available = _read_available_assets(self.scenario, self.variation).get("available_assets", {})
         if clear:
             self.object_sets = []
+            self.sample_entry_index = {}
+            self.selection_constraints = []
             self.constraints = []
             self.placed_keys.clear()
             self.template_name = "draft"
@@ -138,14 +157,21 @@ class ConstraintStudio:
             "version": 1,
             "scenario": self.scenario,
             "variation": self.variation,
-            "object_sets": [dict(s) for s in self.object_sets],
+            "object_sets": [{"category": s["category"]} for s in self.object_sets],
+            "sample_entry_index": {category: list(indices) for category, indices in self.sample_entry_index.items()},
+            "selection_constraints": [dict(c) for c in self.selection_constraints],
             "constraints": [dict(c) for c in self.constraints],
         }
 
     def load_template(self, name: str) -> None:
         data = json.loads(_constraint_path(self.scenario, self.variation, name).read_text())
         self.template_name = Path(name).stem
-        self.object_sets = [dict(s) for s in data.get("object_sets", [])]
+        self.object_sets = [{"category": str(s["category"])} for s in data.get("object_sets", [])]
+        self.selection_constraints = [
+            self._normalize_selection_constraint(c)
+            for c in data.get("selection_constraints", [])
+        ]
+        self._load_sample_entry_index(data.get("sample_entry_index"))
         self.constraints = [self._normalize_relation(c) for c in data.get("constraints", [])]
         self.placed_keys = set(self._mentioned_keys_in_order())
         self._rebuild_scene()
@@ -165,24 +191,135 @@ class ConstraintStudio:
         if path.exists():
             raise ValueError(f"template already exists: {self.template_name}")
         self.object_sets = []
+        self.sample_entry_index = {}
+        self.selection_constraints = []
         self.constraints = []
         self.placed_keys.clear()
         self._rebuild_scene()
         return self.save_template(self.template_name)
 
-    def randomize_sets(self) -> None:
-        by_category: dict[str, list[int]] = {}
-        for index, object_set in enumerate(self.object_sets):
-            by_category.setdefault(object_set["category"], []).append(index)
+    def _category_set_count(self, category: str) -> int:
+        return sum(1 for object_set in self.object_sets if object_set["category"] == category)
 
-        for category, indices in by_category.items():
+    def _load_sample_entry_index(self, raw) -> None:
+        if raw is None:
+            self.sample_entry_index = self._new_sample_entry_index()
+            self._sample_entries()
+            return
+        if not isinstance(raw, dict):
+            raise ValueError("sample_entry_index must be an object")
+        sample: dict[str, list[int]] = {}
+        for category in self.available:
+            count = self._category_set_count(category)
+            values = raw.get(category, [])
+            if count == 0:
+                continue
+            if len(values) != count:
+                raise ValueError(f"sample_entry_index.{category} must have {count} entries")
             entries = self.available[category]["entries"]
-            if len(entries) < len(indices):
-                raise ValueError(f"{category} has {len(indices)} sets but only {len(entries)} available entries")
-            choices = random.sample(range(len(entries)), len(indices))
-            for set_index, entry_index in zip(indices, choices):
-                self.object_sets[set_index]["entry_index"] = entry_index
+            sample[category] = []
+            for value in values:
+                entry_index = int(value)
+                if entry_index < 0 or entry_index >= len(entries):
+                    raise ValueError(f"{category}: invalid sample entry index {entry_index}")
+                sample[category].append(entry_index)
+        self.sample_entry_index = sample
+        self._apply_same_entry_samples()
 
+    def _new_sample_entry_index(self) -> dict[str, list[int]]:
+        out = {}
+        for category in self.available:
+            count = self._category_set_count(category)
+            if count:
+                out[category] = [0] * count
+        return out
+
+    def _entry_index(self, category: str, set_index: int) -> int:
+        return self.sample_entry_index[category][set_index]
+
+    def _set_entry_index(self, category: str, set_index: int, entry_index: int) -> None:
+        self.sample_entry_index.setdefault(category, [])
+        while len(self.sample_entry_index[category]) <= set_index:
+            self.sample_entry_index[category].append(0)
+        self.sample_entry_index[category][set_index] = int(entry_index)
+
+    def _same_entry_units(self) -> list[tuple[str, list[int]]]:
+        units = []
+        claimed: set[tuple[str, int]] = set()
+        for relation in self.selection_constraints:
+            if relation["type"] != "same_entry":
+                continue
+            self._validate_selection_constraint(relation)
+            category = relation["category"]
+            sets = list(relation["sets"])
+            for set_index in sets:
+                key = (category, set_index)
+                if key in claimed:
+                    raise ValueError(f"{category}[{set_index}] belongs to multiple same_entry constraints")
+                claimed.add(key)
+            units.append((category, sets))
+        for category in self.available:
+            for set_index in range(self._category_set_count(category)):
+                if (category, set_index) not in claimed:
+                    units.append((category, [set_index]))
+        return units
+
+    def _apply_same_entry_samples(self) -> None:
+        claimed: set[tuple[str, int]] = set()
+        for category, sets in self._same_entry_units():
+            if len(sets) == 1:
+                continue
+            entry_index = self.sample_entry_index[category][sets[0]]
+            for set_index in sets:
+                key = (category, set_index)
+                if key in claimed:
+                    raise ValueError(f"{category}[{set_index}] belongs to multiple same_entry constraints")
+                claimed.add(key)
+                self.sample_entry_index[category][set_index] = entry_index
+
+    def _validate_assigned_selection_constraints(self, sample: dict[str, list[int]], assigned: set[tuple[str, int]]) -> None:
+        for relation in self.selection_constraints:
+            if relation["type"] != "bbox_larger_than":
+                continue
+            refs = (relation["larger"], relation["smaller"])
+            if all((ref["category"], ref["set"]) in assigned for ref in refs):
+                self._validate_selection_constraint(relation, sample)
+
+    def _sample_entries(self) -> None:
+        sample = self._new_sample_entry_index()
+        units = self._same_entry_units()
+        random.shuffle(units)
+        assigned: set[tuple[str, int]] = set()
+
+        def search(index: int) -> bool:
+            if index == len(units):
+                for relation in self.selection_constraints:
+                    self._validate_selection_constraint(relation, sample)
+                return True
+            category, sets = units[index]
+            choices = list(range(len(self.available[category]["entries"])))
+            random.shuffle(choices)
+            keys = {(category, set_index) for set_index in sets}
+            for entry_index in choices:
+                for set_index in sets:
+                    sample[category][set_index] = entry_index
+                assigned.update(keys)
+                try:
+                    self._validate_assigned_selection_constraints(sample, assigned)
+                except ValueError:
+                    assigned.difference_update(keys)
+                    continue
+                if search(index + 1):
+                    return True
+                assigned.difference_update(keys)
+            return False
+
+        if not search(0):
+            raise ValueError("no valid entry sample satisfies selection_constraints")
+        self.sample_entry_index = sample
+
+    def randomize_sets(self) -> None:
+        self._sample_entries()
         self.placed_keys = set(self._mentioned_keys_in_order())
         self._rebuild_scene(use_jitter=True)
 
@@ -190,24 +327,272 @@ class ConstraintStudio:
         entries = self.available[category]["entries"]
         if not entries:
             raise ValueError(f"{category} has no available asset sets")
-        self.object_sets.append({"category": category, "entry_index": random.randrange(len(entries))})
+        set_index = self._category_set_count(category)
+        self.object_sets.append({"category": category})
+        self._set_entry_index(category, set_index, random.randrange(len(entries)))
         self._refresh_object_index()
         for record in self._object_records():
-            self.fields.setdefault(record["key"], {"x": None, "y": None, "rotation": None})
+            self.fields.setdefault(record["key"], _empty_fields())
+
+    def clone_set(self, category: str, set_index: int) -> None:
+        category = str(category)
+        set_index = int(set_index)
+        if category not in self.available:
+            raise ValueError(f"unknown category: {category}")
+        if set_index < 0 or set_index >= self._category_set_count(category):
+            raise ValueError(f"{category}: unknown set {set_index}")
+        new_set = self._category_set_count(category)
+        self.object_sets.append({"category": category})
+        self._set_entry_index(category, new_set, self._entry_index(category, set_index))
+        relation = self._same_entry_relation_for(category, set_index)
+        if relation is None:
+            self.selection_constraints.append({"type": "same_entry", "category": category, "sets": [set_index, new_set]})
+            self.selection_errors.append(None)
+        else:
+            relation["sets"].append(new_set)
+        self._refresh_object_index()
+        for record in self._object_records():
+            self.fields.setdefault(record["key"], _empty_fields())
+        self._sync_selection()
+        self.apply_constraints()
 
     def delete_object(self, key: str) -> None:
         ref = self._ref_from_key(key)
         category_sets = [i for i, s in enumerate(self.object_sets) if s["category"] == ref["category"]]
         if ref["set"] >= len(category_sets):
             return
+        records = self._object_records()
+        record_keys = {record["key"] for record in records}
+        if key not in record_keys:
+            return
+        removed_keys = {
+            record["key"] for record in records
+            if record["ref"]["category"] == ref["category"] and record["ref"]["set"] == ref["set"]
+        }
+        key_map = {
+            record["key"]: self._key_after_deleted_set(record["ref"], ref["category"], ref["set"])
+            for record in records
+        }
+
         self.object_sets.pop(category_sets[ref["set"]])
-        self.constraints = [c for c in self.constraints if key not in self._relation_keys(c)]
-        self.placed_keys.discard(key)
-        self._rebuild_scene()
+        self.sample_entry_index[ref["category"]].pop(ref["set"])
+        if not self.sample_entry_index[ref["category"]]:
+            self.sample_entry_index.pop(ref["category"])
+        for deleted_key in removed_keys:
+            sid = self.scene_ids.get(deleted_key)
+            if sid is not None:
+                self.editor.delete(sid)
+        self.selection_constraints = self._selection_constraints_after_deleted_set(ref["category"], ref["set"])
+        self.constraints = [
+            self._remap_relation(c, ref["category"], ref["set"])
+            for c in self.constraints
+            if not (self._relation_keys(c) & removed_keys)
+        ]
+        self.scene_ids = {new_key: sid for old_key, sid in self.scene_ids.items()
+                          if (new_key := key_map.get(old_key)) is not None}
+        self.key_by_scene_id = {sid: key for key, sid in self.scene_ids.items()}
+        self.placed_keys = {new_key for old_key in self.placed_keys
+                            if (new_key := key_map.get(old_key)) is not None}
+        self.selected_keys = {new_key for old_key in self.selected_keys
+                              if (new_key := key_map.get(old_key)) is not None}
+        self.fields = {new_key: value for old_key, value in self.fields.items()
+                       if (new_key := key_map.get(old_key)) is not None}
+        self._refresh_object_index()
+        for record in self._object_records():
+            self.fields.setdefault(record["key"], _empty_fields())
+        self._sync_selection()
+        self.apply_constraints()
 
     def _ref_from_key(self, key: str) -> dict:
         category, set_index, slot = key.split(":")
         return {"category": category, "set": int(set_index), "slot": int(slot)}
+
+    def _key_after_deleted_set(self, ref: dict, category: str, set_index: int) -> str | None:
+        if ref["category"] != category:
+            return _ref_key(ref)
+        if ref["set"] == set_index:
+            return None
+        next_ref = dict(ref)
+        if ref["set"] > set_index:
+            next_ref["set"] = ref["set"] - 1
+        return _ref_key(next_ref)
+
+    def _ref_after_deleted_set(self, ref: dict | None, category: str, set_index: int) -> dict | None:
+        if ref is None:
+            return None
+        if ref["category"] != category or ref["set"] < set_index:
+            return dict(ref)
+        if ref["set"] == set_index:
+            raise ValueError("deleted ref should have removed its relation")
+        next_ref = dict(ref)
+        next_ref["set"] = ref["set"] - 1
+        return next_ref
+
+    def _remap_relation(self, relation: dict, category: str, set_index: int) -> dict:
+        out = dict(relation)
+        for name in ("target", "anchor", "holder"):
+            if name in out:
+                out[name] = self._ref_after_deleted_set(out[name], category, set_index)
+        if "objects" in out:
+            out["objects"] = [self._ref_after_deleted_set(ref, category, set_index) for ref in out["objects"]]
+        if "targets" in out:
+            out["targets"] = [self._ref_after_deleted_set(ref, category, set_index) for ref in out["targets"]]
+        return out
+
+    def _normalize_selection_constraint(self, relation: dict) -> dict:
+        kind = relation.get("type")
+        if kind == "same_entry":
+            category = str(relation["category"])
+            return {"type": kind, "category": category, "sets": _clean_set_ids(relation["sets"])}
+        if kind == "bbox_larger_than":
+            larger = _clean_ref(relation["larger"])
+            smaller = _clean_ref(relation["smaller"])
+            objects = [_clean_ref(ref) for ref in relation.get("objects", [larger, smaller])]
+            if len(objects) != 2:
+                raise ValueError("bbox_larger_than needs exactly two objects")
+            if len({_ref_key(ref) for ref in objects}) != 2:
+                raise ValueError("bbox_larger_than objects must be different")
+            return {"type": kind, "objects": objects, "larger": larger, "smaller": smaller}
+        raise ValueError(f"unknown selection constraint type: {kind}")
+
+    def _same_entry_relation_for(self, category: str, set_index: int) -> dict | None:
+        out = None
+        for relation in self.selection_constraints:
+            if relation["type"] != "same_entry":
+                continue
+            if relation["category"] == category and set_index in relation["sets"]:
+                if out is not None:
+                    raise ValueError(f"{category}[{set_index}] belongs to multiple same_entry constraints")
+                out = relation
+        return out
+
+    def _selection_relation_involves_set(self, relation: dict, category: str, set_index: int) -> bool:
+        kind = relation["type"]
+        if kind == "same_entry":
+            return relation["category"] == category and set_index in relation["sets"]
+        if kind == "bbox_larger_than":
+            return any(
+                ref["category"] == category and ref["set"] == set_index
+                for ref in relation["objects"]
+            )
+        raise ValueError(f"unknown selection constraint type: {kind}")
+
+    def _selection_delete_hook(self, relation: dict, category: str, set_index: int) -> str:
+        kind = relation["type"]
+        if kind == "same_entry":
+            if relation["category"] != category or set_index not in relation["sets"]:
+                raise ValueError("same_entry delete hook received an unrelated set")
+            if len(relation["sets"]) <= 2:
+                return DELETE_RELATION
+            relation["sets"] = [s for s in relation["sets"] if s != set_index]
+            return KEEP_RELATION
+        if kind == "bbox_larger_than":
+            if not self._selection_relation_involves_set(relation, category, set_index):
+                raise ValueError("bbox_larger_than delete hook received an unrelated set")
+            return DELETE_RELATION
+        raise ValueError(f"unknown selection constraint type: {kind}")
+
+    def _remap_selection_constraint(self, relation: dict, category: str, set_index: int) -> dict:
+        out = dict(relation)
+        kind = out["type"]
+        if kind == "same_entry":
+            if out["category"] == category:
+                out["sets"] = [s - 1 if s > set_index else s for s in out["sets"]]
+            return out
+        if kind == "bbox_larger_than":
+            for name in ("larger", "smaller"):
+                ref = dict(out[name])
+                if ref["category"] == category and ref["set"] > set_index:
+                    ref["set"] -= 1
+                out[name] = ref
+            out["objects"] = [
+                {**ref, "set": ref["set"] - 1 if ref["category"] == category and ref["set"] > set_index else ref["set"]}
+                for ref in out["objects"]
+            ]
+            return out
+        raise ValueError(f"unknown selection constraint type: {kind}")
+
+    def _selection_constraints_after_deleted_set(self, category: str, set_index: int) -> list[dict]:
+        kept = []
+        for relation in self.selection_constraints:
+            relation = dict(relation)
+            if self._selection_relation_involves_set(relation, category, set_index):
+                action = self._selection_delete_hook(relation, category, set_index)
+                if action == DELETE_RELATION:
+                    continue
+                if action != KEEP_RELATION:
+                    raise ValueError(f"unknown selection delete action: {action}")
+            kept.append(self._remap_selection_constraint(relation, category, set_index))
+        return kept
+
+    def _entry_asset_id(self, ref: dict, sample: dict[str, list[int]] | None = None) -> str:
+        sample = self.sample_entry_index if sample is None else sample
+        category = ref["category"]
+        set_index = int(ref["set"])
+        slot = int(ref["slot"])
+        if category not in self.available:
+            raise ValueError(f"unknown category: {category}")
+        if set_index < 0 or set_index >= self._category_set_count(category):
+            raise ValueError(f"{category}: unknown set {set_index}")
+        entries = self.available[category]["entries"]
+        entry_index = sample[category][set_index]
+        entry = entries[entry_index]
+        if slot < 0 or slot >= len(entry):
+            raise ValueError(f"{category}[{set_index}]: unknown slot {slot}")
+        return entry[slot]
+
+    def _asset_bbox_xy_area(self, asset_id: str) -> float:
+        geometry = LIBRARY[asset_id].handle.record.geometry
+        aabb = geometry.aabb_m
+        if hasattr(aabb, "size"):
+            size = np.asarray(aabb.size, dtype=float)
+        else:
+            size = np.asarray(aabb["size"], dtype=float)
+        return float(size[0] * size[1])
+
+    def _validate_selection_constraint(self, relation: dict, sample: dict[str, list[int]] | None = None) -> None:
+        kind = relation["type"]
+        if kind == "same_entry":
+            category = relation["category"]
+            if category not in self.available:
+                raise ValueError(f"unknown category: {category}")
+            if len(relation["sets"]) < 2:
+                raise ValueError("same_entry needs at least two sets")
+            if len(set(relation["sets"])) != len(relation["sets"]):
+                raise ValueError("same_entry sets must not contain duplicates")
+            count = self._category_set_count(category)
+            for set_index in relation["sets"]:
+                if set_index < 0 or set_index >= count:
+                    raise ValueError(f"{category}: unknown set {set_index}")
+            return
+        if kind == "bbox_larger_than":
+            object_keys = {_ref_key(ref) for ref in relation["objects"]}
+            if _ref_key(relation["larger"]) not in object_keys or _ref_key(relation["smaller"]) not in object_keys:
+                raise ValueError("bbox_larger_than roles must refer to relation objects")
+            if _ref_key(relation["larger"]) == _ref_key(relation["smaller"]):
+                raise ValueError("bbox_larger_than larger and smaller must be different objects")
+            larger = self._asset_bbox_xy_area(self._entry_asset_id(relation["larger"], sample))
+            smaller = self._asset_bbox_xy_area(self._entry_asset_id(relation["smaller"], sample))
+            if larger < smaller:
+                raise ValueError("larger bbox xy area must be greater than or equal to smaller bbox xy area")
+            return
+        raise ValueError(f"unknown selection constraint type: {kind}")
+
+    def _update_selection_errors(self) -> None:
+        self.selection_errors = []
+        seen_same_entry: set[tuple[str, int]] = set()
+        for relation in self.selection_constraints:
+            try:
+                if relation["type"] == "same_entry":
+                    for set_index in relation["sets"]:
+                        key = (relation["category"], set_index)
+                        if key in seen_same_entry:
+                            raise ValueError(f"{relation['category']}[{set_index}] belongs to multiple same_entry constraints")
+                        seen_same_entry.add(key)
+                self._validate_selection_constraint(relation)
+                self.selection_errors.append(None)
+            except ValueError as exc:
+                self.selection_errors.append(str(exc))
 
     def _object_records(self) -> list[dict]:
         counters: dict[str, int] = {}
@@ -217,7 +602,7 @@ class ConstraintStudio:
             set_index = counters.get(category, 0)
             counters[category] = set_index + 1
             entries = self.available[category]["entries"]
-            entry_index = int(object_set.get("entry_index", 0)) % len(entries)
+            entry_index = self._entry_index(category, set_index)
             for slot, asset_id in enumerate(entries[entry_index]):
                 ref = {"category": category, "set": set_index, "slot": slot}
                 key = _ref_key(ref)
@@ -303,6 +688,9 @@ class ConstraintStudio:
         self.editor._settle(obj)
         self.selected_keys = {key}
         self._sync_selection()
+        if key not in self._relation_key_set():
+            self.editor.scene.update_render()
+            return
         self.apply_constraints({key})
 
     def _move_center_to(self, obj, x: float | None = None, y: float | None = None) -> None:
@@ -313,12 +701,16 @@ class ConstraintStudio:
         ny = pose.p[1] if y is None else pose.p[1] + float(y) - float(center[1])
         obj.set_pose(sapien.Pose([nx, ny, pose.p[2]], pose.q))
 
-    def _set_rotation(self, obj, axis: str) -> None:
-        yaw = float(axis) if not isinstance(axis, str) else self._yaw_for_axis(obj, axis)
+    def _set_rotation(self, obj, axis) -> None:
+        yaw = self._yaw_for_axis(obj, axis)
         pose = obj.get_pose()
         obj.set_pose(sapien.Pose(pose.p, [np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)]))
 
-    def _yaw_for_axis(self, obj, axis: str) -> float:
+    def _yaw_for_axis(self, obj, axis) -> float:
+        if not isinstance(axis, str):
+            return float(axis)
+        if axis in ("0", "90", "180", "270"):
+            return np.radians(float(axis))
         if axis == "any":
             return 0.0
         aabb = obj.asset.handle.record.geometry.aabb_m
@@ -331,6 +723,10 @@ class ConstraintStudio:
         if axis == "vertical":
             return np.pi / 2 if long_is_x else 0.0
         raise ValueError(f"unknown axis: {axis}")
+
+    def _nearest_right_angle(self, ref: dict) -> str:
+        yaw = self._current_yaw_deg(ref)
+        return str(int(round(yaw / 90.0) * 90) % 360)
 
     def select_scene_id(self, scene_id: str | None) -> None:
         key = self.key_by_scene_id.get(scene_id or "")
@@ -357,7 +753,26 @@ class ConstraintStudio:
         relation = self._default_relation(relation_type, refs)
         self._init_relation_params_from_current(relation, None)
         self.constraints.append(relation)
+        if reason := self._incomplete_reason(relation):
+            self._resize_relation_status()
+            self.relation_incomplete[-1] = reason
+            return
         self.apply_constraints(set(self._relation_writes(relation)))
+
+    def add_selection_constraint(self, relation_type: str) -> None:
+        refs = [self._ref_from_key(k) for k in self._stable_keys(self.selected_keys)]
+        if relation_type == "bbox_larger_than":
+            if len(refs) != 2:
+                raise ValueError("bbox_larger_than needs exactly two selected objects")
+            first_area = self._asset_bbox_xy_area(self._entry_asset_id(refs[0]))
+            second_area = self._asset_bbox_xy_area(self._entry_asset_id(refs[1]))
+            larger, smaller = (refs[0], refs[1]) if first_area >= second_area else (refs[1], refs[0])
+            relation = {"type": relation_type, "objects": refs, "larger": larger, "smaller": smaller}
+        else:
+            raise ValueError(f"unknown selection constraint type: {relation_type}")
+        relation = self._normalize_selection_constraint(relation)
+        self.selection_constraints.append(relation)
+        self.apply_constraints()
 
     def update_relation(self, index: int, relation: dict) -> None:
         old = self.constraints[index]
@@ -366,19 +781,44 @@ class ConstraintStudio:
         self.constraints[index] = relation
         self.apply_constraints(set(self._relation_writes(self.constraints[index])))
 
-    def pick_relation_ref(self, index: int, field: str, scene_id: str | None) -> None:
+    def _picked_ref_from_relation(self, relation: dict, scene_id: str | None) -> dict:
         key = self.key_by_scene_id.get(scene_id or "")
         if not key:
             raise ValueError("click an object")
-        relation = dict(self.constraints[index])
         if key not in self._relation_keys(relation):
             raise ValueError("picked object must belong to this relation")
-        relation[field] = self._ref_from_key(key)
-        self.update_relation(index, relation)
+        return self._ref_from_key(key)
+
+    def pick_relation_ref(self, index: int, field: str, scene_id: str | None, mode: str = "layout") -> None:
+        if mode == "layout":
+            relation = dict(self.constraints[index])
+            relation[field] = self._picked_ref_from_relation(relation, scene_id)
+            self.update_relation(index, relation)
+            return
+        if mode == "selection":
+            relation = dict(self.selection_constraints[index])
+            if relation["type"] != "bbox_larger_than" or field not in ("larger", "smaller"):
+                raise ValueError(f"{relation['type']} has no pickable {field}")
+            relation[field] = self._picked_ref_from_relation(relation, scene_id)
+            self.update_selection_relation(index, relation)
+            return
+        raise ValueError(f"unknown relation mode: {mode}")
 
     def delete_relation(self, index: int) -> None:
         self.constraints.pop(index)
         self.apply_constraints()
+
+    def delete_selection_relation(self, index: int) -> None:
+        self.selection_constraints.pop(index)
+        self.apply_constraints()
+
+    def update_selection_relation(self, index: int, relation: dict) -> None:
+        self.selection_constraints[index] = self._normalize_selection_constraint(relation)
+        self.apply_constraints()
+
+    def _resize_relation_status(self) -> None:
+        self.relation_errors = (self.relation_errors + [None] * len(self.constraints))[:len(self.constraints)]
+        self.relation_incomplete = (self.relation_incomplete + [None] * len(self.constraints))[:len(self.constraints)]
 
     def _default_relation(self, relation_type: str, refs: list[dict]) -> dict:
         first = refs[0]
@@ -398,7 +838,8 @@ class ConstraintStudio:
         if relation_type == "align_axis":
             if len(refs) != 1:
                 raise ValueError("align_axis needs exactly one selected object")
-            return {"type": relation_type, "objects": refs, "target": first, "axis": "horizontal", "jitter_deg": 0}
+            return {"type": relation_type, "objects": refs, "target": first,
+                    "axis": self._nearest_right_angle(first), "jitter_deg": 0}
         if relation_type in ("in_same_vertical_line", "in_same_horizontal_line", "evenly_spaced_from_anchor"):
             if len(refs) < 2:
                 raise ValueError(f"{relation_type} needs at least two selected objects")
@@ -406,7 +847,7 @@ class ConstraintStudio:
             if relation_type == "evenly_spaced_from_anchor":
                 relation["mode"] = "footprint"
             return relation
-        if relation_type in ("x_offset_from", "y_offset_from", "xy_offset_from"):
+        if relation_type in ("x_offset_from", "y_offset_from", "xy_offset_from", "on_top_of"):
             if len(refs) != 2:
                 raise ValueError(f"{relation_type} needs exactly two selected objects")
             return {"type": relation_type, "objects": refs}
@@ -614,7 +1055,7 @@ class ConstraintStudio:
             return "set y"
         if kind == "align_axis" and not relation.get("axis"):
             return "choose axis"
-        if kind in ("in_same_vertical_line", "in_same_horizontal_line", "evenly_spaced_from_anchor", "x_offset_from", "y_offset_from", "xy_offset_from"):
+        if kind in ("in_same_vertical_line", "in_same_horizontal_line", "evenly_spaced_from_anchor", "x_offset_from", "y_offset_from", "xy_offset_from", "on_top_of"):
             if not relation.get("anchor"):
                 return "choose anchor"
             if not self._targets_from_relation(relation, "anchor"):
@@ -693,15 +1134,36 @@ class ConstraintStudio:
             r["order"] = self._normalize_even_order(r, r.get("order"))
             if not r["order"] and r.get("objects"):
                 r["order"] = LOCAL_IDS[:len(r["objects"])]
+        if r.get("type") == "align_axis":
+            axis = r.get("axis", "0")
+            if axis == "horizontal":
+                r["axis"] = "0"
+            elif axis == "vertical":
+                r["axis"] = "90"
+            elif axis not in ALIGN_AXES:
+                try:
+                    value = int(round(float(axis))) % 360
+                except (TypeError, ValueError):
+                    raise ValueError(f"unknown align axis: {axis}")
+                if str(value) in ALIGN_AXES:
+                    r["axis"] = str(value)
+                else:
+                    r["axis"] = "custom"
+                    r["yaw_deg"] = value
         if "objects" not in r:
             r["objects"] = self._relation_refs(r)
         return r
 
     def apply_constraints(self, settle_keys: set[str] | None = None, use_jitter: bool = False) -> None:
-        self.fields = {record["key"]: {"x": None, "y": None, "rotation": None} for record in self._object_records()}
+        self._update_selection_errors()
+        self.fields = {record["key"]: _empty_fields() for record in self._object_records()}
         self.relation_errors = [None] * len(self.constraints)
         self.relation_incomplete = [None] * len(self.constraints)
         settle_keys = settle_keys or set()
+        deferred = self._defer_unconstrained_objects(settle_keys)
+        parkable_keys = set(self._parkable_relation_keys_in_order())
+        self._park_constrained_objects(parkable_keys)
+        self._preapply_alignments(parkable_keys)
         for i, relation in enumerate(self.constraints):
             try:
                 writes = self._relation_writes(relation)
@@ -711,6 +1173,64 @@ class ConstraintStudio:
                 self.relation_incomplete[i] = str(exc)
             except ValueError as exc:
                 self.relation_errors[i] = str(exc)
+        self._restore_unconstrained_objects(deferred, settle_keys)
+
+    def _defer_unconstrained_objects(self, settle_keys: set[str]) -> list[tuple[str, sapien.Pose]]:
+        relation_keys = set(self._mentioned_keys_in_order())
+        out = []
+        for key, sid in self.scene_ids.items():
+            if key in relation_keys:
+                continue
+            obj = self.editor.objects[sid]
+            out.append((key, obj.get_pose()))
+            self._park_object(obj, len(out))
+        if out:
+            self._sync_physics_frames()
+        out.sort(key=lambda item: item[0] in settle_keys)
+        return out
+
+    def _park_constrained_objects(self, parkable_keys: set[str]) -> None:
+        moved = False
+        for index, key in enumerate(self._active_relation_keys_in_order(), start=1):
+            if key not in parkable_keys:
+                continue
+            sid = self.scene_ids.get(key)
+            if sid is None:
+                continue
+            self._park_object(self.editor.objects[sid], index)
+            moved = True
+        if moved:
+            self._sync_physics_frames()
+
+    def _park_object(self, obj, index: int) -> None:
+        obj.set_pose(sapien.Pose(
+            [20.0 + index, 20.0, self.editor.scene_wrap.table["height"] + 1.0],
+            obj.get_pose().q,
+        ))
+
+    def _preapply_alignments(self, parkable_keys: set[str]) -> None:
+        for relation in self.constraints:
+            if relation.get("type") != "align_axis" or self._incomplete_reason(relation):
+                continue
+            key = _ref_key(self._target_ref(relation))
+            sid = self._ensure_spawned(key)
+            self._set_rotation(self.editor.objects[sid], self._align_axis_value(relation))
+            if key in parkable_keys:
+                self._park_object(self.editor.objects[sid], self.number_by_key.get(key, 1))
+
+    def _restore_unconstrained_objects(self, deferred: list[tuple[str, sapien.Pose]], settle_keys: set[str]) -> None:
+        for key, pose in deferred:
+            sid = self.scene_ids.get(key)
+            if sid is None:
+                continue
+            obj = self.editor.objects[sid]
+            obj.set_pose(pose)
+            self.editor._settle(obj)
+
+    def _sync_physics_frames(self) -> None:
+        for _ in range(3):
+            self.editor.scene.step()
+        self.editor.scene.update_render()
 
     def _require(self, key: str, field: str) -> float | str:
         value = self.fields[key][field]
@@ -729,6 +1249,16 @@ class ConstraintStudio:
         amount = abs(float(relation.get(name, 0) or 0))
         return random.uniform(-amount, amount) if amount else 0.0
 
+    def _align_axis_value(self, relation: dict, use_jitter: bool = False):
+        axis = str(relation.get("axis", "0"))
+        if axis == "custom":
+            yaw_deg = float(relation.get("yaw_deg", 0)) + self._jitter(relation, "jitter_deg", use_jitter)
+            return np.radians(yaw_deg)
+        if axis in ("0", "90", "180", "270"):
+            yaw_deg = float(axis) + self._jitter(relation, "jitter_deg", use_jitter)
+            return np.radians(yaw_deg)
+        return axis
+
     def _apply_relation(self, relation: dict, use_jitter: bool = False) -> None:
         kind = relation["type"]
         reason = self._incomplete_reason(relation)
@@ -743,11 +1273,7 @@ class ConstraintStudio:
             self._write(key, "x", _mid(relation["x"]) + self._jitter(relation, "x_jitter", use_jitter))
             self._write(key, "y", _mid(relation["y"]) + self._jitter(relation, "y_jitter", use_jitter))
         elif kind == "align_axis":
-            axis = relation.get("axis", "horizontal")
-            if axis == "custom":
-                self._write(_ref_key(self._target_ref(relation)), "rotation", np.radians(float(relation.get("yaw_deg", 0))))
-            else:
-                self._write(_ref_key(self._target_ref(relation)), "rotation", axis)
+            self._write(_ref_key(self._target_ref(relation)), "rotation", self._align_axis_value(relation, use_jitter))
         elif kind == "in_same_vertical_line":
             anchor = _ref_key(relation["anchor"])
             x = self._require(anchor, "x")
@@ -801,6 +1327,8 @@ class ConstraintStudio:
             target = _ref_key(self._single_target_from(relation, "anchor"))
             self._write(target, "x", float(self._require(anchor, "x")) + float(relation.get("dx", 0)) + self._jitter(relation, "dx_jitter", use_jitter))
             self._write(target, "y", float(self._require(anchor, "y")) + float(relation.get("dy", 0)) + self._jitter(relation, "dy_jitter", use_jitter))
+        elif kind == "on_top_of":
+            self._single_target_from(relation, "anchor")
         elif kind == "pen_in_holder":
             holder = _ref_key(relation["holder"])
             target = _ref_key(self._single_target_from(relation, "holder"))
@@ -855,6 +1383,12 @@ class ConstraintStudio:
                 obj = self.editor.objects[self.scene_ids[key]]
                 pose = obj.get_pose()
                 obj.set_pose(sapien.Pose(pose.p, (spin * sapien.Pose(q=pose.q)).q))
+
+        if relation_index is None and not (set(editable) & self._relation_key_set()):
+            for key in editable:
+                self.editor._settle(self.editor.objects[self.scene_ids[key]])
+            self.editor.scene.update_render()
+            return
 
         if relation_index is not None and 0 <= relation_index < len(self.constraints):
             self._update_relation_from_preview(relation_index, editable, field)
@@ -953,12 +1487,50 @@ class ConstraintStudio:
         keys = []
         seen = set()
         for relation in self.constraints:
-            for ref in self._relation_refs(relation):
+            for ref in self._relation_refs_for_load_order(relation):
                 key = _ref_key(ref)
                 if key not in seen:
                     seen.add(key)
                     keys.append(key)
         return keys
+
+    def _active_relation_keys_in_order(self) -> list[str]:
+        keys = []
+        seen = set()
+        for relation in self.constraints:
+            try:
+                if not self._relation_writes(relation):
+                    continue
+            except ValueError:
+                pass
+            for ref in self._relation_refs_for_load_order(relation):
+                key = _ref_key(ref)
+                if key not in seen:
+                    seen.add(key)
+                    keys.append(key)
+        return keys
+
+    def _parkable_relation_keys_in_order(self) -> list[str]:
+        writes_by_key: dict[str, set[str]] = {}
+        for relation in self.constraints:
+            try:
+                writes = self._relation_writes(relation)
+            except ValueError:
+                continue
+            for key, fields in writes.items():
+                writes_by_key.setdefault(key, set()).update(fields)
+        return [
+            key for key in self._active_relation_keys_in_order()
+            if {"x", "y"} <= writes_by_key.get(key, set())
+        ]
+
+    def _relation_refs_for_load_order(self, relation: dict) -> list[dict]:
+        if relation.get("type") == "on_top_of" and relation.get("anchor"):
+            return [relation["anchor"], *self._targets_from_relation(relation, "anchor")]
+        return self._relation_refs(relation)
+
+    def _relation_key_set(self) -> set[str]:
+        return set(self._active_relation_keys_in_order())
 
     def _label(self, key: str) -> str:
         return str(self.number_by_key.get(key, key))
@@ -967,7 +1539,7 @@ class ConstraintStudio:
         records = []
         for record in self._object_records():
             key = record["key"]
-            fields = self.fields.get(key, {"x": None, "y": None, "rotation": None})
+            fields = self.fields.get(key, _empty_fields())
             records.append({
                 **record,
                 "num_id": self.number_by_key[key],
@@ -982,6 +1554,9 @@ class ConstraintStudio:
             "template_name": self.template_name,
             "available_categories": list(self.available),
             "objects": records,
+            "sample_entry_index": self.sample_entry_index,
+            "selection_constraints": self.selection_constraints,
+            "selection_errors": self.selection_errors,
             "constraints": self.constraints,
             "relation_errors": self.relation_errors,
             "relation_incomplete": self.relation_incomplete,
@@ -1044,6 +1619,8 @@ async def ws(socket: WebSocket):
                         await socket.send_json({"type": "randomized"})
                     elif kind == "add_set":
                         studio.add_set(msg["category"])
+                    elif kind == "clone_set":
+                        studio.clone_set(msg["category"], int(msg["set"]))
                     elif kind == "delete_object":
                         studio.delete_object(msg["key"])
                     elif kind == "place_object":
@@ -1056,13 +1633,19 @@ async def ws(socket: WebSocket):
                         studio.select_rect(msg["x0"], msg["y0"], msg["x1"], msg["y1"])
                     elif kind == "add_relation":
                         studio.add_relation(msg["relation"])
+                    elif kind == "add_selection_constraint":
+                        studio.add_selection_constraint(msg["relation"])
                     elif kind == "pick_relation_ref":
                         scene_id = studio.editor.scene_id_at(int(msg["x"]), int(msg["y"]))
-                        studio.pick_relation_ref(int(msg["index"]), msg["field"], scene_id)
+                        studio.pick_relation_ref(int(msg["index"]), msg["field"], scene_id, msg.get("mode", "layout"))
                     elif kind == "update_relation":
                         studio.update_relation(int(msg["index"]), msg["relation"])
+                    elif kind == "update_selection_relation":
+                        studio.update_selection_relation(int(msg["index"]), msg["relation"])
                     elif kind == "delete_relation":
                         studio.delete_relation(int(msg["index"]))
+                    elif kind == "delete_selection_relation":
+                        studio.delete_selection_relation(int(msg["index"]))
                     elif kind == "reapply":
                         studio.apply_constraints()
                     elif kind == "key":

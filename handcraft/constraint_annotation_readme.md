@@ -18,6 +18,13 @@ annotator adds category sets, and each concrete object is addressed by:
 { "category": "cutlery_a", "set": 0, "slot": 2 }
 ```
 
+`object_sets` stores only high-level category instances. The preview/debug
+sample is stored separately in `sample_entry_index`; it is not a constraint.
+
+Selection constraints are stored in `selection_constraints`, beside the layout
+`constraints`. They constrain which `available_assets` entry is sampled and are
+evaluated from asset metadata, not from the simulation scene.
+
 ## Object State
 
 Every concrete object must end with:
@@ -64,6 +71,35 @@ New creates an empty constraint file for the current variation, clears the scene
 and selects the new template name in the UI.
 
 ## Relations
+
+## Selection Constraints
+
+### same_entry
+
+Set-level relation. All listed set instances of one category must use the same
+entry from `available_assets`.
+
+```json
+{ "type": "same_entry", "category": "cutlery_a", "sets": [0, 1, 2] }
+```
+
+The relation is created by cloning a set in the annotation UI.
+
+### bbox_larger_than
+
+Object-level selection relation. Compares stable-frame asset bounding boxes from
+asset metadata before the scene is built. The `larger` object's XY bbox area
+must be greater than or equal to the `smaller` object's XY bbox area.
+
+```json
+{
+  "type": "bbox_larger_than",
+  "larger": {"category": "plate", "set": 0, "slot": 0},
+  "smaller": {"category": "bowl", "set": 0, "slot": 0}
+}
+```
+
+## Layout Relations
 
 ### table_x
 
@@ -112,7 +148,7 @@ Single-object relation. Defines `target.rotation`.
 {
   "type": "align_axis",
   "target": {"category": "cutlery_a", "set": 0, "slot": 1},
-  "axis": "vertical",
+  "axis": "90",
   "jitter_deg": 5
 }
 ```
@@ -120,10 +156,16 @@ Single-object relation. Defines `target.rotation`.
 Supported axes:
 
 ```text
-horizontal
-vertical
+0
+90
+180
+270
 any
+custom
 ```
+
+When an `align_axis` relation is created, the UI snaps the object's current yaw
+to the nearest right angle. `custom` uses `yaw_deg`.
 
 ### in_same_vertical_line
 
@@ -255,6 +297,26 @@ Two-object relation. Reads `anchor.x` and `anchor.y`, writes `target.x` and
   "dy_jitter": 0
 }
 ```
+
+### on_top_of
+
+Two-object ordering relation. The anchor is the lower object and the other object
+is above it. This relation does not define `x`, `y`, `rotation`, or a separate
+`z` field in the annotation preview; it only records stack order for generation.
+
+```json
+{
+  "type": "on_top_of",
+  "objects": [
+    {"category": "plate", "set": 0, "slot": 0},
+    {"category": "bowl", "set": 0, "slot": 0}
+  ],
+  "anchor": {"category": "plate", "set": 0, "slot": 0}
+}
+```
+
+Use `xy_offset_from` with `dx = 0` and `dy = 0` when the stacked objects should
+share the same table-plane center.
 
 ### pen_in_holder
 

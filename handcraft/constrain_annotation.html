@@ -20,6 +20,8 @@
   button:hover { background: #496381; }
   button.danger { background: #633a36; }
   button.danger:hover { background: #7a453f; }
+  button.selection { background: #e0a126; color: #18120a; }
+  button.selection:hover { background: #f0b73d; }
   #status { min-height: 18px; color: #91c4a7; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   #categories { overflow: auto; padding: 10px; }
@@ -54,13 +56,17 @@
   #menu { position: fixed; z-index: 20; display: none; min-width: 230px; background: #252a33; border: 1px solid #3a414d;
           border-radius: 6px; padding: 6px; box-shadow: 0 12px 30px rgba(0,0,0,0.35); }
   #menu button { display: block; width: 100%; margin: 3px 0; text-align: left; background: #303848; }
+  #menu button.selection { background: #e0a126; color: #18120a; }
+  #menu button.selection:hover { background: #f0b73d; }
   #menu button:hover { background: #3d4a61; }
 
   #relations { overflow: auto; padding: 10px; }
   .rel { border: 1px solid #303640; border-radius: 6px; background: #171a20; margin-bottom: 8px; overflow: hidden; }
+  .rel.selection { border-color: #d19024; background: #251f13; }
   .rel.incomplete { border-color: #4388d6; background: #151d2a; }
   .rel.error { border-color: #a64a40; background: #241918; }
   .rel-head { display: flex; align-items: center; gap: 8px; padding: 8px; cursor: pointer; background: #252a33; }
+  .rel.selection .rel-head { background: #d99a25; color: #18120a; }
   .rel.incomplete .rel-head { background: #203049; }
   .rel.error .rel-head { background: #3a2421; }
   .rel-title { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -77,7 +83,14 @@
                border-radius: 3px; background: #3d526f; color: #fff; font-weight: 700; font-size: 12px; }
   .ref-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .err { color: #e09a8d; font-size: 12px; margin-top: 7px; overflow-wrap: anywhere; }
+  .muted { color: #c4cad3; font-size: 12px; margin-top: 7px; overflow-wrap: anywhere; }
   .info { color: #89bfff; font-size: 12px; margin-top: 7px; overflow-wrap: anywhere; }
+  .toggle { display: inline-flex; gap: 4px; }
+  .toggle button { padding: 5px 9px; background: #303848; }
+  .toggle button.active { background: #3d526f; }
+  .toggle button.selection { background: #4a3d25; color: #d7b56b; }
+  .toggle button.selection:hover { background: #5b4828; color: #f0c46a; }
+  .toggle button.selection.active { background: #e0a126; color: #18120a; }
 </style>
 </head>
 <body>
@@ -110,7 +123,14 @@
 
   <aside id="right">
     <div class="bar">
-      <div class="row"><b>Relations</b><button id="refresh" style="margin-left:auto">Reapply</button></div>
+      <div class="row">
+        <b>Relations</b>
+        <div class="toggle" style="margin-left:auto">
+          <button id="layoutMode" class="active">Layout</button>
+          <button id="selectionMode" class="selection">Selection</button>
+        </div>
+        <button id="refresh">Reapply</button>
+      </div>
     </div>
     <div id="relations"></div>
   </aside>
@@ -127,6 +147,7 @@ const send = (m) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringi
 let meta = [];
 let state = null;
 let expanded = null;
+let relationMode = 'layout';
 let boxSelect = null;
 let suppressClick = false;
 let dragKey = null;
@@ -194,6 +215,11 @@ function objectRow(obj) {
   row.addEventListener('click', () => {
     if (obj.scene_id) send({ type: 'select', scene_id: obj.scene_id });
   });
+  row.addEventListener('contextmenu', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    showSetMenu(ev.clientX, ev.clientY, obj.ref);
+  });
   const im = document.createElement('img');
   im.loading = 'lazy';
   im.src = '/preview?asset_id=' + encodeURIComponent(obj.asset_id);
@@ -243,13 +269,33 @@ function refLabel(ref) {
   return `${ref.category}[${ref.set}][${ref.slot}]`;
 }
 
+function setLabel(category, setIndex) {
+  return `${category}[${setIndex}]`;
+}
+
 function localRefId(rel, ref) {
   const refs = rel.objects || [];
   const index = refs.findIndex((candidate) => refKey(candidate) === refKey(ref));
   return index >= 0 ? LOCAL_IDS[index] : '';
 }
 
+function relationLocalId(rel, ref) {
+  const refs = relationRefs(rel);
+  const key = ref.slot === undefined ? `${ref.category}:${ref.set}` : refKey(ref);
+  const index = refs.findIndex((candidate) => {
+    const candidateKey = candidate.slot === undefined ? `${candidate.category}:${candidate.set}` : refKey(candidate);
+    return candidateKey === key;
+  });
+  return index >= 0 ? LOCAL_IDS[index] : '';
+}
+
 function relationRefs(rel) {
+  if (rel.type === 'same_entry') {
+    return (rel.sets || []).map((setIndex) => ({ category: rel.category, set: setIndex }));
+  }
+  if (rel.type === 'bbox_larger_than') {
+    return rel.objects || [rel.larger, rel.smaller].filter(Boolean);
+  }
   const refs = [...(rel.objects || [])];
   for (const name of ['target', 'anchor', 'holder']) if (rel[name]) refs.push(rel[name]);
   for (const ref of rel.targets || []) refs.push(ref);
@@ -263,6 +309,8 @@ function relationRefs(rel) {
 }
 
 function relationSummary(rel) {
+  if (rel.type === 'same_entry') return `${rel.type}(${(rel.sets || []).map((s) => setLabel(rel.category, s)).join(', ')})`;
+  if (rel.type === 'bbox_larger_than' && rel.larger && rel.smaller) return `${rel.type}(${refLabel(rel.larger)} > ${refLabel(rel.smaller)})`;
   if (rel.type === 'evenly_spaced_from_anchor' && rel.order) return `${rel.type}(${rel.order})`;
   return `${rel.type}(${relationRefs(rel).map(refLabel).join(', ')})`;
 }
@@ -274,11 +322,17 @@ function orderText(rel) {
 function renderRelations() {
   const box = $('relations');
   box.innerHTML = '';
-  state.constraints.forEach((rel, index) => {
+  $('layoutMode').classList.toggle('active', relationMode === 'layout');
+  $('selectionMode').classList.toggle('active', relationMode === 'selection');
+  const rels = relationMode === 'selection' ? (state.selection_constraints || []) : (state.constraints || []);
+  const errors = relationMode === 'selection' ? (state.selection_errors || []) : (state.relation_errors || []);
+  const incomplete = relationMode === 'selection' ? [] : (state.relation_incomplete || []);
+  rels.forEach((rel, index) => {
     const card = document.createElement('div');
     card.className = 'rel'
-      + (state.relation_errors[index] ? ' error' : '')
-      + (state.relation_incomplete[index] ? ' incomplete' : '')
+      + (relationMode === 'selection' ? ' selection' : '')
+      + (errors[index] ? ' error' : '')
+      + (incomplete[index] ? ' incomplete' : '')
       + (expanded === index ? ' open' : '');
     const head = document.createElement('div');
     head.className = 'rel-head';
@@ -291,23 +345,23 @@ function renderRelations() {
     del.textContent = '×';
     del.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      send({ type: 'delete_relation', index });
+      send({ type: relationMode === 'selection' ? 'delete_selection_relation' : 'delete_relation', index });
     });
     head.append(title, del);
     const body = document.createElement('div');
     body.className = 'rel-body';
     body.appendChild(refBlock(rel));
     body.appendChild(paramBlock(rel, index));
-    if (state.relation_incomplete[index]) {
+    if (incomplete[index]) {
       const info = document.createElement('div');
       info.className = 'info';
-      info.textContent = state.relation_incomplete[index];
+      info.textContent = incomplete[index];
       body.appendChild(info);
     }
-    if (state.relation_errors[index]) {
+    if (errors[index]) {
       const err = document.createElement('div');
       err.className = 'err';
-      err.textContent = state.relation_errors[index];
+      err.textContent = errors[index];
       body.appendChild(err);
     }
     card.append(head, body);
@@ -322,10 +376,10 @@ function refBlock(rel) {
     line.className = 'object-ref';
     const badge = document.createElement('span');
     badge.className = 'ref-badge';
-    badge.textContent = rel.type === 'evenly_spaced_from_anchor' ? localRefId(rel, ref) : '';
+    badge.textContent = relationLocalId(rel, ref);
     const text = document.createElement('span');
     text.className = 'ref-text';
-    text.textContent = refLabel(ref);
+    text.textContent = ref.slot === undefined ? setLabel(ref.category, ref.set) : refLabel(ref);
     line.append(badge, text);
     box.appendChild(line);
   });
@@ -364,7 +418,7 @@ function paramBlock(rel, index) {
     const refs = relationRefs(rel);
     for (const ref of refs) {
       const key = refKey(ref);
-      const prefix = rel.type === 'evenly_spaced_from_anchor' ? `${localRefId(rel, ref)}. ` : '';
+      const prefix = `${relationLocalId(rel, ref)}. `;
       select.add(new Option(prefix + refLabel(ref), key));
     }
     select.value = rel[name] ? refKey(rel[name]) : '';
@@ -379,7 +433,7 @@ function paramBlock(rel, index) {
     pick.textContent = '⌖';
     pick.title = `pick ${name} in scene`;
     pick.addEventListener('click', () => {
-      pendingRefPick = { index, field: name };
+      pendingRefPick = { index, field: name, mode: relationMode };
       setHint(`${rel.type}: click an object to set ${name}. Press Escape to cancel.`);
     });
     picker.append(select, pick);
@@ -440,8 +494,8 @@ function paramBlock(rel, index) {
     const label = document.createElement('span');
     label.textContent = 'axis';
     const select = document.createElement('select');
-    for (const v of ['horizontal', 'vertical', 'any', 'custom']) select.add(new Option(v, v));
-    select.value = rel.axis || 'horizontal';
+    for (const v of ['0', '90', '180', '270', 'any', 'custom']) select.add(new Option(v, v));
+    select.value = rel.axis || '0';
     select.addEventListener('change', () => updateRel(index, { ...rel, axis: select.value }));
     line.append(label, select);
     box.appendChild(line);
@@ -451,8 +505,9 @@ function paramBlock(rel, index) {
   if (['table_x', 'table_xy'].includes(rel.type)) addNumber('x_jitter', 0);
   if (['table_y', 'table_xy'].includes(rel.type)) addNumber('y_jitter', 0);
   if (rel.type === 'align_axis') { addAlignAxis(); addNumber('yaw_deg'); addNumber('jitter_deg'); }
-  if (['in_same_vertical_line', 'in_same_horizontal_line', 'evenly_spaced_from_anchor', 'x_offset_from', 'y_offset_from', 'xy_offset_from'].includes(rel.type)) addRefSelect('anchor');
+  if (['in_same_vertical_line', 'in_same_horizontal_line', 'evenly_spaced_from_anchor', 'x_offset_from', 'y_offset_from', 'xy_offset_from', 'on_top_of'].includes(rel.type)) addRefSelect('anchor');
   if (rel.type === 'pen_in_holder') addRefSelect('holder');
+  if (rel.type === 'bbox_larger_than') { addRefSelect('larger'); addRefSelect('smaller'); }
   if (rel.type === 'evenly_spaced_from_anchor') { addAxis(); addMode(); addOrder(); addNumber('spacing'); addNumber('spacing_jitter', 0); }
   if (['x_offset_from', 'xy_offset_from'].includes(rel.type)) addNumber('dx');
   if (['y_offset_from', 'xy_offset_from'].includes(rel.type)) addNumber('dy');
@@ -460,7 +515,7 @@ function paramBlock(rel, index) {
   if (['y_offset_from', 'xy_offset_from'].includes(rel.type)) addNumber('dy_jitter', 0);
   if (!box.children.length) {
     const line = document.createElement('div');
-    line.className = 'err';
+    line.className = 'muted';
     line.textContent = 'no editable parameters';
     box.appendChild(line);
   }
@@ -468,7 +523,7 @@ function paramBlock(rel, index) {
 }
 
 function updateRel(index, rel) {
-  send({ type: 'update_relation', index, relation: rel });
+  send({ type: relationMode === 'selection' ? 'update_selection_relation' : 'update_relation', index, relation: rel });
 }
 
 function toImage(ev) {
@@ -533,7 +588,14 @@ canvas.addEventListener('click', (ev) => {
   hideMenu();
   const p = toImage(ev);
   if (pendingRefPick) {
-    send({ type: 'pick_relation_ref', index: pendingRefPick.index, field: pendingRefPick.field, x: p.x, y: p.y });
+    send({
+      type: 'pick_relation_ref',
+      mode: pendingRefPick.mode,
+      index: pendingRefPick.index,
+      field: pendingRefPick.field,
+      x: p.x,
+      y: p.y
+    });
     pendingRefPick = null;
     setHint(null);
     return;
@@ -574,7 +636,14 @@ function validRelations() {
   const out = [];
   if (n === 1) out.push('table_x', 'table_y', 'table_xy', 'align_axis');
   if (n >= 2) out.push('in_same_vertical_line', 'in_same_horizontal_line', 'evenly_spaced_from_anchor');
-  if (n === 2) out.push('x_offset_from', 'y_offset_from', 'xy_offset_from', 'pen_in_holder');
+  if (n === 2) out.push('x_offset_from', 'y_offset_from', 'xy_offset_from', 'on_top_of', 'pen_in_holder');
+  return out;
+}
+
+function validSelectionRelations() {
+  const n = (state.selected_keys || []).length;
+  const out = [];
+  if (n === 2) out.push('bbox_larger_than');
   return out;
 }
 
@@ -582,7 +651,22 @@ function showMenu(x, y) {
   const menu = $('menu');
   menu.innerHTML = '';
   const rels = validRelations();
-  if (!rels.length) {
+  const selectionRels = validSelectionRelations();
+  if (selectionRels.length) {
+    for (const rel of selectionRels) {
+      const b = document.createElement('button');
+      b.className = 'selection';
+      b.textContent = rel;
+      b.addEventListener('click', () => {
+        hideMenu();
+        relationMode = 'selection';
+        expanded = null;
+        send({ type: 'add_selection_constraint', relation: rel });
+      });
+      menu.appendChild(b);
+    }
+  }
+  if (!rels.length && !selectionRels.length) {
     const b = document.createElement('button');
     b.textContent = 'select object(s) first';
     b.disabled = true;
@@ -603,6 +687,21 @@ function showMenu(x, y) {
   menu.style.display = 'block';
 }
 function hideMenu() { $('menu').style.display = 'none'; }
+
+function showSetMenu(x, y, ref) {
+  const menu = $('menu');
+  menu.innerHTML = '';
+  const clone = document.createElement('button');
+  clone.textContent = 'clone set';
+  clone.addEventListener('click', () => {
+    hideMenu();
+    send({ type: 'clone_set', category: ref.category, set: ref.set });
+  });
+  menu.appendChild(clone);
+  menu.style.left = Math.min(x, window.innerWidth - 250) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - 100) + 'px';
+  menu.style.display = 'block';
+}
 
 async function loadMeta() {
   const data = await (await fetch('/meta')).json();
@@ -636,6 +735,16 @@ $('newTemplate').addEventListener('click', () => {
 });
 $('randomize').addEventListener('click', () => send({ type: 'randomize' }));
 $('refresh').addEventListener('click', () => send({ type: 'reapply' }));
+$('layoutMode').addEventListener('click', () => {
+  relationMode = 'layout';
+  expanded = null;
+  renderRelations();
+});
+$('selectionMode').addEventListener('click', () => {
+  relationMode = 'selection';
+  expanded = null;
+  renderRelations();
+});
 
 loadMeta();
 </script>
