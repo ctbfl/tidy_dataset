@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>available assets editor</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; background: #15161a; color: #dde1e8;
+         font-family: ui-sans-serif, system-ui, sans-serif; display: flex; }
+  button, input, select { font: inherit; }
+  #main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #17191f; }
+  #topbar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #20242b;
+            border-bottom: 1px solid #303640; }
+  #topbar label { font-size: 12px; color: #9aa3b2; }
+  #topbar select, #topbar input { background: #11141a; color: #dde1e8; border: 1px solid #3a414d;
+                                  border-radius: 4px; padding: 7px 9px; }
+  #topbar input { width: 190px; }
+  #addCategory, #save { border: none; border-radius: 4px; padding: 8px 12px; color: #fff; cursor: pointer; }
+  #addCategory { background: #3d526f; }
+  #addCategory:hover { background: #496381; }
+  #save { margin-left: auto; background: #2f6b4e; }
+  #save:hover { background: #3a8762; }
+  #status { min-width: 210px; font-size: 12px; color: #91c4a7; text-align: right; }
+
+  #categories { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: block; }
+  .category { background: #20242b; border: 1px solid #303640; border-radius: 6px; margin-bottom: 12px; }
+  .category-head { display: grid; grid-template-columns: minmax(180px, 1fr) 120px auto; gap: 8px;
+                   align-items: center; padding: 10px; background: #252a33; }
+  .category-head input { background: #11141a; color: #dde1e8; border: 1px solid #3a414d; border-radius: 4px; padding: 7px; }
+  .category-head button { background: #633a36; color: #fff; border: none; border-radius: 4px; padding: 7px 10px; cursor: pointer; }
+  .entry-grid { padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, 110px); gap: 9px; align-items: start; }
+  .entry { width: 110px; background: #13161c; border: 1px solid #2e3540; border-radius: 5px; padding: 6px; display: grid; gap: 6px; }
+  .entry.empty { border-style: dashed; }
+  .slot { position: relative; width: 96px; height: 96px; border: 1px dashed #4b5565; border-radius: 4px; display: grid;
+          place-items: center; padding: 4px; background: #191d24; cursor: pointer; }
+  .slot:hover, .slot.hot { border-color: #d9bd65; background: #20232a; }
+  .slot img { width: 100%; height: 100%; object-fit: cover; background: #0c0e12; border-radius: 3px; }
+  .slot .empty-thumb { width: 100%; height: 100%; border-radius: 3px; background: #0c0e12; display: grid;
+                       place-items: center; color: #5f6876; font-size: 22px; }
+  .slot-remove { position: absolute; left: -6px; top: -6px; width: 20px; height: 20px; border-radius: 50%;
+                 border: 1px solid rgba(255,255,255,0.65); background: #b33b32; color: #fff; line-height: 18px;
+                 text-align: center; font-size: 14px; padding: 0; cursor: pointer; display: none;
+                 box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+  .slot:hover .slot-remove { display: block; }
+  .slot-id-bubble { position: absolute; left: 0; top: calc(100% + 5px); display: none; z-index: 5;
+                    min-width: 220px; max-width: 720px; padding: 5px 8px; border-radius: 8px;
+                    background: rgba(13,15,20,0.92); color: #eef1f6; border: 1px solid rgba(217,189,101,0.55);
+                    font-size: 10px; line-height: 1.25; overflow: visible; white-space: normal; overflow-wrap: anywhere;
+                    box-shadow: 0 3px 10px rgba(0,0,0,0.35); pointer-events: none; }
+  .slot:hover .slot-id-bubble { display: block; }
+  .empty-note { color: #798494; font-size: 12px; text-align: center; padding: 16px; }
+
+  #browser { width: 390px; background: #1d2027; border-left: 1px solid #303640; display: flex;
+             flex-direction: column; padding: 10px; gap: 8px; }
+  #filters input, #filters select { width: 100%; background: #11141a; color: #dde1e8; border: 1px solid #3a414d;
+                                    padding: 7px; border-radius: 4px; margin-bottom: 7px; }
+  #selectedAsset { font-size: 12px; color: #d9bd65; min-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #count { font-size: 12px; color: #8f98a8; }
+  #grid { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(3, 1fr);
+          gap: 7px; align-content: start; }
+  .cell { position: relative; aspect-ratio: 1; background: #0c0e12; border-radius: 5px; border: 2px solid transparent;
+          cursor: grab; }
+  .cell:hover, .cell.selected { border-color: #d9bd65; }
+  .cell img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .cell-label { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; color: #dce1ea;
+                background: rgba(12,14,18,0.78); text-align: center; padding: 1px 2px; overflow: hidden;
+                text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+</style>
+</head>
+<body>
+  <div id="main">
+    <div id="topbar">
+      <label>Scenario</label><select id="scenario"></select>
+      <label>Variation</label><select id="variation"></select>
+      <input id="categoryId" placeholder="category_id" />
+      <label>Slots</label>
+      <input id="slotCount" type="number" min="1" value="1" />
+      <button id="addCategory">Add Category</button>
+      <button id="save">Save</button>
+      <div id="status"></div>
+    </div>
+    <div id="categories"></div>
+  </div>
+
+  <div id="browser">
+    <div id="filters">
+      <input id="search" placeholder="search id / label / tag..." />
+      <select id="tag"><option value="">all tags</option></select>
+      <select id="source"><option value="">all sources</option></select>
+    </div>
+    <div id="selectedAsset"></div>
+    <div id="count"></div>
+    <div id="grid"></div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let scenarios = [];
+let config = { version: 1, available_assets: {} };
+let selectedAsset = null;
+let draggedAsset = null;
+let assetResults = [];
+
+function setStatus(text, isError = false) {
+  $('status').textContent = text;
+  $('status').style.color = isError ? '#e09a8d' : '#91c4a7';
+}
+
+function currentKeys() {
+  return Object.keys(config.available_assets);
+}
+
+function categoryEntries(category) {
+  const entries = category.entries || [];
+  const blank = Array.from({ length: category.slot_count }, () => '');
+  if (!entries.length || entries[entries.length - 1].every(Boolean)) return [...entries, blank];
+  return entries;
+}
+
+function storeVisibleEntries(category, visibleEntries) {
+  category.entries = visibleEntries.filter((entry) => entry.some(Boolean));
+}
+
+function duplicateEntryIndex(entries, target, targetIndex) {
+  if (!target.every(Boolean)) return -1;
+  return entries.findIndex((entry, i) =>
+    i !== targetIndex && entry.every(Boolean) && entry.length === target.length &&
+    entry.every((assetId, j) => assetId === target[j])
+  );
+}
+
+function renderCategories() {
+  const box = $('categories');
+  box.innerHTML = '';
+  const keys = currentKeys();
+  if (!keys.length) {
+    const note = document.createElement('div');
+    note.className = 'empty-note';
+    note.textContent = 'No categories yet.';
+    box.appendChild(note);
+    return;
+  }
+  for (const key of keys) renderCategory(box, key, config.available_assets[key]);
+}
+
+function renderCategory(parent, key, category) {
+  const wrap = document.createElement('div');
+  wrap.className = 'category';
+
+  const head = document.createElement('div');
+  head.className = 'category-head';
+  const name = document.createElement('input');
+  name.value = key;
+  name.placeholder = 'category_id';
+  name.addEventListener('change', () => renameCategory(key, name.value));
+  const count = document.createElement('input');
+  count.type = 'number';
+  count.min = '1';
+  count.value = category.slot_count;
+  count.addEventListener('change', () => resizeCategory(key, Number(count.value)));
+  const del = document.createElement('button');
+  del.textContent = 'Delete';
+  del.addEventListener('click', () => {
+    delete config.available_assets[key];
+    renderCategories();
+  });
+  head.append(name, count, del);
+  wrap.appendChild(head);
+
+  const grid = document.createElement('div');
+  grid.className = 'entry-grid';
+  const visible = categoryEntries(category);
+  visible.forEach((entry, entryIndex) => {
+    const card = document.createElement('div');
+    card.className = 'entry' + (entry.length === 1 ? ' single' : '') + (entry.every((x) => !x) ? ' empty' : '');
+    entry.forEach((assetId, slotIndex) => {
+      card.appendChild(renderSlot(key, category, visible, entryIndex, slotIndex, assetId));
+    });
+    grid.appendChild(card);
+  });
+  wrap.appendChild(grid);
+  parent.appendChild(wrap);
+}
+
+function renderSlot(key, category, visibleEntries, entryIndex, slotIndex, assetId) {
+  const slot = document.createElement('div');
+  slot.className = 'slot';
+  slot.addEventListener('dragover', (ev) => {
+    ev.preventDefault();
+    slot.classList.add('hot');
+  });
+  slot.addEventListener('dragleave', () => slot.classList.remove('hot'));
+  slot.addEventListener('drop', (ev) => {
+    ev.preventDefault();
+    slot.classList.remove('hot');
+    if (draggedAsset) fillSlot(key, category, visibleEntries, entryIndex, slotIndex, draggedAsset);
+  });
+  slot.addEventListener('click', () => {
+    if (selectedAsset) fillSlot(key, category, visibleEntries, entryIndex, slotIndex, selectedAsset);
+  });
+
+  if (assetId) {
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.src = '/preview?asset_id=' + encodeURIComponent(assetId);
+    slot.appendChild(img);
+    const bubble = document.createElement('div');
+    bubble.className = 'slot-id-bubble';
+    bubble.textContent = assetId;
+    slot.appendChild(bubble);
+  } else {
+    const empty = document.createElement('div');
+    empty.className = 'empty-thumb';
+    empty.textContent = '+';
+    slot.appendChild(empty);
+  }
+  if (assetId) {
+    const remove = document.createElement('button');
+    remove.className = 'slot-remove';
+    remove.textContent = '×';
+    remove.title = 'remove';
+    remove.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      fillSlot(key, category, visibleEntries, entryIndex, slotIndex, '');
+    });
+    slot.appendChild(remove);
+  }
+  return slot;
+}
+
+function fillSlot(key, category, visibleEntries, entryIndex, slotIndex, assetId) {
+  const nextEntry = [...visibleEntries[entryIndex]];
+  nextEntry[slotIndex] = assetId;
+  if (assetId && nextEntry.some((existing, i) => i !== slotIndex && existing === assetId)) {
+    setStatus(`${assetId} is already in this set`, true);
+    return;
+  }
+  if (assetId && duplicateEntryIndex(visibleEntries, nextEntry, entryIndex) >= 0) {
+    setStatus(`duplicate set in ${key}`, true);
+    return;
+  }
+  visibleEntries[entryIndex][slotIndex] = assetId;
+  storeVisibleEntries(category, visibleEntries);
+  config.available_assets[key] = category;
+  renderCategories();
+}
+
+function renameCategory(oldKey, rawNewKey) {
+  const newKey = rawNewKey.trim();
+  if (!newKey || newKey === oldKey) {
+    renderCategories();
+    return;
+  }
+  if (config.available_assets[newKey]) {
+    setStatus(`category exists: ${newKey}`, true);
+    renderCategories();
+    return;
+  }
+  config.available_assets[newKey] = config.available_assets[oldKey];
+  delete config.available_assets[oldKey];
+  renderCategories();
+}
+
+function resizeCategory(key, value) {
+  const slotCount = Math.max(1, Math.floor(value || 1));
+  const category = config.available_assets[key];
+  category.slot_count = slotCount;
+  category.entries = (category.entries || []).map((entry) => {
+    const next = entry.slice(0, slotCount);
+    while (next.length < slotCount) next.push('');
+    return next;
+  }).filter((entry) => entry.every(Boolean));
+  renderCategories();
+}
+
+function addCategory() {
+  const categoryId = $('categoryId').value.trim();
+  const slotCount = Math.max(1, Math.floor(Number($('slotCount').value) || 1));
+  if (!categoryId) {
+    setStatus('category_id is required', true);
+    return;
+  }
+  if (config.available_assets[categoryId]) {
+    setStatus(`category exists: ${categoryId}`, true);
+    return;
+  }
+  config.available_assets[categoryId] = { slot_count: slotCount, entries: [] };
+  $('categoryId').value = '';
+  renderCategories();
+}
+
+async function loadMeta() {
+  const meta = await (await fetch('/meta')).json();
+  scenarios = meta.scenarios;
+  for (const s of meta.sources) $('source').add(new Option(s, s));
+  for (const t of meta.tags) $('tag').add(new Option(t, t));
+  $('scenario').innerHTML = '';
+  for (const s of scenarios) $('scenario').add(new Option(s.scenario, s.scenario));
+  const dining = [...$('scenario').options].find((o) => o.value === 'dining_table');
+  if (dining) $('scenario').value = 'dining_table';
+  loadVariations();
+}
+
+function loadVariations() {
+  const found = scenarios.find((s) => s.scenario === $('scenario').value);
+  $('variation').innerHTML = '';
+  for (const v of (found ? found.variations : [])) $('variation').add(new Option(v, v));
+  const afterMeal = [...$('variation').options].find((o) => o.value === 'after_meal_cleanup');
+  if (afterMeal) $('variation').value = 'after_meal_cleanup';
+  loadConfig();
+}
+
+async function loadConfig() {
+  if (!$('scenario').value || !$('variation').value) return;
+  const params = new URLSearchParams({ scenario: $('scenario').value, variation: $('variation').value });
+  config = await (await fetch('/available_assets?' + params)).json();
+  renderCategories();
+  setStatus('loaded');
+}
+
+async function saveConfig() {
+  const params = new URLSearchParams({ scenario: $('scenario').value, variation: $('variation').value });
+  const resp = await fetch('/available_assets?' + params, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    setStatus(data.detail || 'save failed', true);
+    return;
+  }
+  setStatus(`saved ${data.category_count} categories`);
+}
+
+async function loadAssets() {
+  const q = new URLSearchParams({
+    search: $('search').value,
+    tag: $('tag').value,
+    source: $('source').value,
+  });
+  assetResults = await (await fetch('/assets?' + q)).json();
+  $('count').textContent = `${assetResults.length} assets`;
+  const grid = $('grid');
+  grid.innerHTML = '';
+  for (const asset of assetResults) {
+    const cell = document.createElement('div');
+    cell.className = 'cell' + (asset.id === selectedAsset ? ' selected' : '');
+    cell.draggable = true;
+    cell.title = `${asset.label || asset.id}\n${asset.id}`;
+    cell.addEventListener('dragstart', () => { draggedAsset = asset.id; });
+    cell.addEventListener('dragend', () => { draggedAsset = null; });
+    cell.addEventListener('click', () => {
+      selectedAsset = asset.id;
+      $('selectedAsset').textContent = `selected: ${asset.id}`;
+      loadAssets();
+    });
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.src = '/preview?asset_id=' + encodeURIComponent(asset.id);
+    const label = document.createElement('div');
+    label.className = 'cell-label';
+    label.textContent = asset.label || asset.id;
+    cell.append(img, label);
+    grid.appendChild(cell);
+  }
+}
+
+let searchTimer;
+$('addCategory').addEventListener('click', addCategory);
+$('save').addEventListener('click', saveConfig);
+$('scenario').addEventListener('change', loadVariations);
+$('variation').addEventListener('change', loadConfig);
+$('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadAssets, 250); });
+$('tag').addEventListener('change', loadAssets);
+$('source').addEventListener('change', loadAssets);
+
+loadMeta();
+loadAssets();
+</script>
+</body>
+</html>
