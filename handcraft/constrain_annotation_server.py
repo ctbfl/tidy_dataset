@@ -20,7 +20,7 @@ SIMULATIONS_DIR = HERE.parent / "simulations"
 if str(SIMULATIONS_DIR) not in sys.path:
     sys.path.insert(0, str(SIMULATIONS_DIR))
 
-from editor import OUTLINE_COLOR, RELATION_OUTLINE_COLOR, SceneEditor, _world_aabb  # noqa: E402
+from editor import OUTLINE_COLOR, RELATION_OUTLINE_COLOR, SceneEditor, _world_aabb, _xy_overlaps  # noqa: E402
 from objects import Asset, spawn  # noqa: E402
 from preview import PreviewRenderer  # noqa: E402
 from scene import LIBRARY  # noqa: E402
@@ -116,6 +116,7 @@ class ConstraintStudio:
         self.scenario = "dining_table"
         self.variation = "after_meal_cleanup"
         self.template_name = "draft"
+        self.user_prompt = ""
         self.available = {}
         self.object_sets: list[dict] = []
         self.sample_entry_index: dict[str, list[int]] = {}
@@ -130,6 +131,8 @@ class ConstraintStudio:
         self.selection_errors: list[str | None] = []
         self.relation_errors: list[str | None] = []
         self.relation_incomplete: list[str | None] = []
+        self._active_support_snapshot: dict | None = None
+        self._pending_support_snapshot: dict | None = None
         self._num = 0
         self.load_variation(self.scenario, self.variation, clear=True)
 
@@ -144,6 +147,7 @@ class ConstraintStudio:
             self.constraints = []
             self.placed_keys.clear()
             self.template_name = "draft"
+            self.user_prompt = ""
         self._rebuild_scene()
 
     def list_constraint_templates(self) -> list[str]:
@@ -157,6 +161,7 @@ class ConstraintStudio:
             "version": 1,
             "scenario": self.scenario,
             "variation": self.variation,
+            "user_prompt": self.user_prompt,
             "object_sets": [{"category": s["category"]} for s in self.object_sets],
             "sample_entry_index": {category: list(indices) for category, indices in self.sample_entry_index.items()},
             "selection_constraints": [dict(c) for c in self.selection_constraints],
@@ -166,6 +171,7 @@ class ConstraintStudio:
     def load_template(self, name: str) -> None:
         data = json.loads(_constraint_path(self.scenario, self.variation, name).read_text())
         self.template_name = Path(name).stem
+        self.user_prompt = str(data.get("user_prompt", ""))
         self.object_sets = [{"category": str(s["category"])} for s in data.get("object_sets", [])]
         self.selection_constraints = [
             self._normalize_selection_constraint(c)
@@ -194,6 +200,7 @@ class ConstraintStudio:
         self.sample_entry_index = {}
         self.selection_constraints = []
         self.constraints = []
+        self.user_prompt = ""
         self.placed_keys.clear()
         self._rebuild_scene()
         return self.save_template(self.template_name)
@@ -937,13 +944,6 @@ class ConstraintStudio:
             )
         ]
 
-    def _default_even_anchor(self, ordered_refs: list[dict], axis: str) -> dict:
-        for ref in ordered_refs:
-            fields = self.fields.get(_ref_key(ref))
-            if fields and fields.get(axis) is not None:
-                return ref
-        return ordered_refs[0]
-
     def _even_order_sides(self, relation: dict) -> tuple[list[dict], list[dict]]:
         order = self._even_order_refs(relation)
         anchor_key = _ref_key(relation["anchor"])
@@ -1061,8 +1061,6 @@ class ConstraintStudio:
             if not relation.get("order"):
                 ordered_refs = self._ordered_refs_by_axis(refs, relation["axis"])
                 relation["order"] = self._even_order_from_refs(relation, ordered_refs)
-            if not relation.get("anchor"):
-                relation["anchor"] = self._default_even_anchor(self._even_order_refs(relation), relation["axis"])
             changed = (
                 old is None
                 or old.get("axis") != relation.get("axis")
@@ -1110,6 +1108,11 @@ class ConstraintStudio:
                 return "choose mode"
             if relation.get("spacing") is None:
                 return "set spacing"
+            if relation.get("anchor"):
+                anchor_key = _ref_key(relation["anchor"])
+                axis = relation["axis"]
+                if self.fields.get(anchor_key, {}).get(axis) is None:
+                    return f"define anchor {axis}"
         if kind in ("x_offset_from", "xy_offset_from") and relation.get("dx") is None:
             return "set dx"
         if kind in ("y_offset_from", "xy_offset_from") and relation.get("dy") is None:
@@ -1199,24 +1202,30 @@ class ConstraintStudio:
 
     def apply_constraints(self, settle_keys: set[str] | None = None, use_jitter: bool = False) -> None:
         self._update_selection_errors()
+        support_snapshot = self._pending_support_snapshot or self._make_support_snapshot()
+        self._pending_support_snapshot = None
+        self._active_support_snapshot = support_snapshot
         self.fields = {record["key"]: _empty_fields() for record in self._object_records()}
         self.relation_errors = [None] * len(self.constraints)
         self.relation_incomplete = [None] * len(self.constraints)
         settle_keys = settle_keys or set()
-        deferred = self._defer_unconstrained_objects(settle_keys)
-        parkable_keys = set(self._parkable_relation_keys_in_order())
-        self._park_constrained_objects(parkable_keys)
-        self._preapply_alignments(parkable_keys)
-        for i, relation in enumerate(self.constraints):
-            try:
-                writes = self._relation_writes(relation)
-                self._apply_relation(relation, use_jitter)
-                self._apply_preview(set(writes), settle_keys)
-            except IncompleteRelation as exc:
-                self.relation_incomplete[i] = str(exc)
-            except ValueError as exc:
-                self.relation_errors[i] = str(exc)
-        self._restore_unconstrained_objects(deferred, settle_keys)
+        try:
+            deferred = self._defer_unconstrained_objects(settle_keys)
+            parkable_keys = set(self._parkable_relation_keys_in_order())
+            self._park_constrained_objects(parkable_keys)
+            self._preapply_alignments(parkable_keys)
+            for i, relation in enumerate(self.constraints):
+                try:
+                    writes = self._relation_writes(relation)
+                    self._apply_relation(relation, use_jitter)
+                    self._apply_preview(set(writes), settle_keys)
+                except IncompleteRelation as exc:
+                    self.relation_incomplete[i] = str(exc)
+                except ValueError as exc:
+                    self.relation_errors[i] = str(exc)
+            self._restore_unconstrained_objects(deferred, settle_keys)
+        finally:
+            self._active_support_snapshot = None
 
     def _defer_unconstrained_objects(self, settle_keys: set[str]) -> list[tuple[str, sapien.Pose]]:
         relation_keys = set(self._mentioned_keys_in_order())
@@ -1274,6 +1283,127 @@ class ConstraintStudio:
         for _ in range(3):
             self.editor.scene.step()
         self.editor.scene.update_render()
+
+    def _make_support_snapshot(self) -> dict:
+        aabbs = {
+            key: _world_aabb(self.editor.objects[sid].entity)
+            for key, sid in self.scene_ids.items()
+            if sid in self.editor.objects
+        }
+        overlaps = set()
+        keys = sorted(aabbs, key=lambda key: self.number_by_key.get(key, 10_000))
+        for i, a in enumerate(keys):
+            for b in keys[i + 1:]:
+                if _xy_overlaps(aabbs[a], aabbs[b]):
+                    overlaps.add(frozenset((a, b)))
+        return {
+            "bottom": {key: float(aabb[0][2]) for key, aabb in aabbs.items()},
+            "overlaps": overlaps,
+        }
+
+    def _strict_support_edges(self) -> dict[frozenset[str], tuple[str, str]]:
+        edges = {}
+        for relation in self.constraints:
+            kind = relation.get("type")
+            try:
+                if kind == "on_top_of" and not self._incomplete_reason(relation):
+                    lower = _ref_key(relation["anchor"])
+                    upper = _ref_key(self._single_target_from(relation, "anchor"))
+                elif kind == "pen_in_holder" and not self._incomplete_reason(relation):
+                    lower = _ref_key(relation["holder"])
+                    upper = _ref_key(self._single_target_from(relation, "holder"))
+                else:
+                    continue
+            except (KeyError, ValueError):
+                continue
+            pair = frozenset((lower, upper))
+            previous = edges.get(pair)
+            if previous is not None and previous != (lower, upper):
+                raise ValueError(f"conflicting support relation between {self._label(lower)} and {self._label(upper)}")
+            edges[pair] = (lower, upper)
+        return edges
+
+    def _support_order_graph(self, moving_keys: set[str]) -> dict[str, set[str]]:
+        keys = {
+            key for key, sid in self.scene_ids.items()
+            if sid in self.editor.objects
+        }
+        graph = {key: set() for key in keys}
+        aabbs = {key: _world_aabb(self.editor.objects[self.scene_ids[key]].entity) for key in keys}
+        snapshot = self._active_support_snapshot or self._make_support_snapshot()
+        old_bottom = snapshot["bottom"]
+        old_overlaps = snapshot["overlaps"]
+        strict_edges = self._strict_support_edges()
+        ordered = sorted(keys, key=lambda key: self.number_by_key.get(key, 10_000))
+        eps = 1e-3
+        for i, a in enumerate(ordered):
+            for b in ordered[i + 1:]:
+                if not _xy_overlaps(aabbs[a], aabbs[b]):
+                    continue
+                pair = frozenset((a, b))
+                if pair in strict_edges:
+                    lower, upper = strict_edges[pair]
+                elif pair in old_overlaps and abs(old_bottom.get(a, aabbs[a][0][2]) - old_bottom.get(b, aabbs[b][0][2])) > eps:
+                    lower, upper = (a, b) if old_bottom.get(a, 0.0) < old_bottom.get(b, 0.0) else (b, a)
+                elif (a in moving_keys) != (b in moving_keys):
+                    lower, upper = (b, a) if a in moving_keys else (a, b)
+                elif abs(old_bottom.get(a, aabbs[a][0][2]) - old_bottom.get(b, aabbs[b][0][2])) > eps:
+                    lower, upper = (a, b) if old_bottom.get(a, 0.0) < old_bottom.get(b, 0.0) else (b, a)
+                else:
+                    lower, upper = (a, b)
+                graph[lower].add(upper)
+        return graph
+
+    def _topological_support_order(self, graph: dict[str, set[str]]) -> list[str]:
+        indegree = {key: 0 for key in graph}
+        for targets in graph.values():
+            for target in targets:
+                indegree[target] += 1
+        ready = sorted(
+            (key for key, degree in indegree.items() if degree == 0),
+            key=lambda key: self.number_by_key.get(key, 10_000),
+        )
+        out = []
+        while ready:
+            key = ready.pop(0)
+            out.append(key)
+            for target in sorted(graph[key], key=lambda item: self.number_by_key.get(item, 10_000)):
+                indegree[target] -= 1
+                if indegree[target] == 0:
+                    ready.append(target)
+                    ready.sort(key=lambda item: self.number_by_key.get(item, 10_000))
+        if len(out) != len(graph):
+            cycle = [self._label(key) for key, degree in indegree.items() if degree > 0]
+            raise ValueError(f"support order cycle: {', '.join(cycle)}")
+        return out
+
+    def _settle_keys_by_support_order(self, keys: set[str], moving_keys: set[str]) -> None:
+        keys = {key for key in keys if key in self.scene_ids}
+        if not keys:
+            return
+        graph = self._support_order_graph(moving_keys)
+        reverse = {key: set() for key in graph}
+        for lower, uppers in graph.items():
+            for upper in uppers:
+                reverse[upper].add(lower)
+        for key in self._topological_support_order(graph):
+            if key not in keys or key not in self.scene_ids:
+                continue
+            keep = reverse.get(key, set()) | {key}
+            parked = []
+            for other_key, sid in self.scene_ids.items():
+                if other_key in keep or sid not in self.editor.objects:
+                    continue
+                obj = self.editor.objects[sid]
+                parked.append((obj, obj.get_pose()))
+                self._park_object(obj, len(parked))
+            try:
+                self.editor._settle(self.editor.objects[self.scene_ids[key]])
+            finally:
+                for obj, pose in parked:
+                    obj.set_pose(pose)
+                if parked:
+                    self._sync_physics_frames()
 
     def _require(self, key: str, field: str) -> float | str:
         value = self.fields[key][field]
@@ -1383,21 +1513,31 @@ class ConstraintStudio:
 
     def _apply_preview(self, keys: set[str], settle_keys: set[str]) -> None:
         table = self.editor.scene_wrap.table
+        changed_keys = set()
         for key in keys:
             sid = self._ensure_spawned(key)
             obj = self.editor.objects[sid]
             fields = self.fields[key]
+            before_aabb = _world_aabb(obj.entity)
+            before_center = (before_aabb[0] + before_aabb[1]) * 0.5
+            before_q = np.asarray(obj.get_pose().q)
             changed = False
             if fields["rotation"] is not None:
                 self._set_rotation(obj, fields["rotation"])
-                changed = True
             x = None if fields["x"] is None else float(fields["x"]) * table["length"] * 0.5
             y = None if fields["y"] is None else float(fields["y"]) * table["width"] * 0.5
             if x is not None or y is not None:
                 self._move_center_to(obj, x, y)
-                changed = True
-            if changed or key in settle_keys:
-                self.editor._settle(obj)
+            after_aabb = _world_aabb(obj.entity)
+            after_center = (after_aabb[0] + after_aabb[1]) * 0.5
+            after_q = np.asarray(obj.get_pose().q)
+            changed = (
+                np.linalg.norm(after_center[:2] - before_center[:2]) > 1e-5
+                or np.linalg.norm(after_q - before_q) > 1e-5
+            )
+            if changed:
+                changed_keys.add(key)
+        self._settle_keys_by_support_order(changed_keys | (set(keys) & settle_keys), changed_keys | settle_keys)
         self.editor.scene.update_render()
 
     def key(self, name: str, fine: bool = False, relation_index: int | None = None) -> None:
@@ -1406,6 +1546,7 @@ class ConstraintStudio:
         selected = [k for k in sorted(self.selected_keys, key=lambda k: self.number_by_key[k]) if k in self.scene_ids]
         if not selected:
             return
+        self._pending_support_snapshot = self._make_support_snapshot()
         field = "rotation" if name in "qe" else ("x" if name in "ad" else "y")
         allowed = self._allowed_keys_for_key_edit(field, relation_index)
         editable = [key for key in selected if key in allowed]

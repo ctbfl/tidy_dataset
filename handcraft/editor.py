@@ -213,7 +213,12 @@ class SceneEditor:
         self.scene.update_render()
 
     def settle_all(self) -> None:
-        """Re-rest loaded objects after asset geometry changes."""
+        """Re-rest loaded objects after asset geometry changes.
+
+        This is order-dependent and only uses geometric XY overlap to infer support.
+        It does not know constraint semantics such as explicit on_top_of edges, so do
+        not use it after constraint solving/sampling.
+        """
         for obj in list(self.objects.values()):
             self._settle(obj)
 
