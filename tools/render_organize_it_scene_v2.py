@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """Render a tidy scene and write the organize_it pipeline's *input capture contract*.
 
-V2 uses the handcraft editor camera pose and fovy, at 1280x720, while keeping
-the same output contract filenames as ``render_organize_it_scene.py``.
-
 Two reference contracts, used deliberately:
 
 1. Camera capture files (``current.png`` / ``current_depth.pkl`` /
@@ -25,10 +22,9 @@ Two reference contracts, used deliberately:
 
 Scene construction uses our loader (``simulations/scene.py``) so the textured
 table, curated PBR materials and handcrafted stable-frame poses render exactly as
-authored. Object world poses == handcraft poses; the calibration world coincides
-with ours (RoboTwin convention, table top z=0.74), so absolute origin is moot
-(pipeline step2 re-detects table z from the point cloud). ``--settle-steps 0``
-(default) renders the curated layout untouched.
+authored. Object world poses == handcraft poses before the short physics settle;
+the calibration world coincides with ours (RoboTwin convention, table top z=0.74),
+so absolute origin is moot (pipeline step2 re-detects table z from the point cloud).
 
 Usage
 -----
@@ -61,6 +57,7 @@ HANDCRAFT_HEIGHT = 720
 HANDCRAFT_FOVY = 0.63
 HANDCRAFT_EYE = (0.0, -0.85, 1.6)
 HANDCRAFT_TARGET = (0.0, 0.0, 0.74)
+DEFAULT_SETTLE_STEPS = 100
 
 
 def load_reference_module():
@@ -200,11 +197,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("scene_dir", type=Path, help="Directory holding scene.json (outputs written here).")
     p.add_argument("--v0", type=Path, default=None, help="Source v0 scene json (default: generation.source_v0_scene).")
     p.add_argument("--prefix", default="current")
-    p.add_argument("--settle-steps", type=int, default=0,
-                   help="Physics steps before capture. 0 (default) preserves the handcrafted arrangement.")
+    p.add_argument("--settle-steps", type=int, default=DEFAULT_SETTLE_STEPS,
+                   help=f"Physics steps before capture. Default: {DEFAULT_SETTLE_STEPS}.")
     p.add_argument("--asset-catalog", type=Path, default=DEFAULT_CATALOG)
-    p.add_argument("--camera-calibration", type=Path, default=DEFAULT_CALIBRATION,
-                   help="Ignored by v2 handcraft-view rendering; accepted for CLI compatibility.")
+    p.add_argument("--camera-calibration", type=Path, default=DEFAULT_CALIBRATION)
     p.add_argument("--camera-name", default="wrist_camera")
     p.add_argument("--near-m", type=float, default=0.02)
     p.add_argument("--far-m", type=float, default=10.0)
@@ -225,17 +221,21 @@ def main() -> None:
     v0 = json.loads(v0_path.read_text())
 
     mod = load_reference_module()
-    camera_info = handcraft_camera_info()
+    calibration = mod.preview._load_robotwin_camera_calibration(args.camera_calibration.expanduser().resolve())
+    camera_info = calibration["camera"]
     if str(SIM_DIR) not in sys.path:
         sys.path.insert(0, str(SIM_DIR))
     import scene as tidy_scene  # simulations/scene.py
     from objects import asset_json_backup_dir  # noqa: E402
 
     overwrite_dir = asset_json_backup_dir(v0_path)
-    asset_registry = mod.AssetRegistry.load(args.asset_catalog.expanduser().resolve())
-    tidy_scene.LIBRARY.load_asset_json_backup(None)
+    asset_registry = mod.AssetRegistry.load(
+        args.asset_catalog.expanduser().resolve(),
+        asset_json_overwrite_dir=overwrite_dir if overwrite_dir.is_dir() else None,
+    )
+    tidy_scene.LIBRARY.load_asset_json_backup(overwrite_dir)
     ts = build_scene_with_tidy_loader(v0, v0.get("table_texture"))
-    camera, T_world_from_sapien_cam = add_handcraft_camera(ts, args.near_m, args.far_m, args.camera_name)
+    camera, T_world_from_sapien_cam = add_calibrated_camera(mod, ts, camera_info, args.near_m, args.far_m, args.camera_name)
     # Contract frame is table-centered (table top z=0): shift the SAPIEN-world camera pose
     # down by the table-top height so it matches the scene.json object poses and
     # generation.workspace_bounds_ur_base / tabletop_area.json. Pure z-translation.
