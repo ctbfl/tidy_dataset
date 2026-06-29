@@ -29,6 +29,13 @@ tmp/*
 __pycache__/
 *.pyc
 
+# Local agent/session state.
+.claude/
+
+# Experiment run outputs.
+aris_exp/
+experiments/vlm_coordinate_frame*/
+
 # Texture curation scratch (thumbnails, montages, CLIP embeddings, preview renders)
 assets/_texture_curate/
 
