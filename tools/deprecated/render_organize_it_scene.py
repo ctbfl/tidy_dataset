@@ -29,8 +29,8 @@ with ours (RoboTwin convention, table top z=0.74), so absolute origin is moot
 
 Usage
 -----
-    python tools/render_organize_it_scene.py <scene_dir>            # dir holding scene.json
-    python tools/render_organize_it_scene.py <scene_dir> --v0 path/to/v0.json
+    python tools/deprecated/render_organize_it_scene.py <scene_dir>            # dir holding scene.json
+    python tools/deprecated/render_organize_it_scene.py <scene_dir> --v0 path/to/v0.json
 """
 from __future__ import annotations
 

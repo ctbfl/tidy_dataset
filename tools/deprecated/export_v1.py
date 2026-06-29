@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""export_v2 — batch-export with the handcraft-view 1280x720 camera.
+"""export_v1 — batch-export a whole scenario directory for the organize_it pipeline.
 
 Point it at a scenario folder (e.g. ``data/scenarios/office_desk``). For every scene
 folder inside it (``001/``, ``002/`` … each holding ``messy.json`` + ``tidy.json``)
@@ -10,7 +10,7 @@ this writes, *in place* in that same folder:
     - ``current.png`` / ``current_depth.pkl`` / ``current_intrinsics.yaml`` /
       ``current_extrinsics.yaml`` + GT segmentation (``current_pybullet_segmentation.npy``,
       ``extract_meta.json``)  — rendered from the calibrated camera by
-      render_organize_it_scene_v2.py, i.e. the exact capture contract the pipeline consumes.
+      render_organize_it_scene.py, i.e. the exact capture contract the pipeline consumes.
 
   From ``tidy.json`` — the goal state:
     - ``reference_goal.png``  — rendered from the SAME calibrated camera (so the goal lines
@@ -22,10 +22,10 @@ couple dozen in one process exhausts the device) — a clean process == clean GP
 
 Usage
 -----
-    python tools/export_v2.py data/scenarios/office_desk
-    python tools/export_v2.py data/scenarios/office_desk --scene-type Desk
-    python tools/export_v2.py data/scenarios/office_desk/001        # a single scene folder
-    python tools/export_v2.py data/scenarios/office_desk --no-render # scene.json only (no GPU)
+    python tools/deprecated/export_v1.py data/scenarios/office_desk
+    python tools/deprecated/export_v1.py data/scenarios/office_desk --scene-type Desk
+    python tools/deprecated/export_v1.py data/scenarios/office_desk/001        # a single scene folder
+    python tools/deprecated/export_v1.py data/scenarios/office_desk --no-render # scene.json only (no GPU)
 """
 from __future__ import annotations
 
@@ -38,13 +38,15 @@ from pathlib import Path
 from PIL import Image
 
 TOOLS_DIR = Path(__file__).resolve().parent
-if str(TOOLS_DIR) not in sys.path:
-    sys.path.insert(0, str(TOOLS_DIR))
+ACTIVE_TOOLS_DIR = TOOLS_DIR.parent
+for path in (TOOLS_DIR, ACTIVE_TOOLS_DIR):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 import export_to_organize_it as EXP          # noqa: E402  (messy.json -> scene.json; no GPU at import)
-import render_organize_it_scene_v2 as RND     # noqa: E402  (tidy.json -> rgb; SAPIEN loaded lazily)
+import render_organize_it_scene as RND        # noqa: E402  (tidy.json -> rgb; SAPIEN loaded lazily)
 
-RENDER_SCRIPT = TOOLS_DIR / "render_organize_it_scene_v2.py"  # messy.json -> full capture contract
+RENDER_SCRIPT = TOOLS_DIR / "render_organize_it_scene.py"  # messy.json -> full capture contract
 INPUT_ARRANGEMENT = "messy"   # -> scene.json + tabletop_area.json + current.* capture
 GOAL_ARRANGEMENT = "tidy"     # -> reference_goal.png
 GOAL_IMAGE_NAME = "reference_goal.png"
@@ -81,7 +83,7 @@ def convert_messy(folder: Path, ctx: dict, scene_type: str | None) -> int:
 # --------------------------------------------------------------------------- #
 # stage 2 — render messy -> full capture contract (current.png / depth / intr / extr / seg)
 # --------------------------------------------------------------------------- #
-# Delegated to render_organize_it_scene_v2.py, run as a subprocess (it reads scene.json,
+# Delegated to render_organize_it_scene.py, run as a subprocess (it reads scene.json,
 # rebuilds the scene from messy.json, and writes the current.* capture files in place).
 def capture_messy_subprocess(folder: Path, args: argparse.Namespace) -> tuple[bool, str]:
     """Render the messy scene's full input-capture contract into the folder. (ok, detail)."""
@@ -108,15 +110,16 @@ def capture_messy_subprocess(folder: Path, args: argparse.Namespace) -> tuple[bo
 # render every scene in its OWN subprocess (this script re-invoked with --render-one):
 # a clean process == clean GPU state, at the cost of one interpreter start per scene.
 def render_goal(folder: Path, near: float, far: float, camera_name: str, calibration_path: Path) -> int:
-    """Render tidy.json from the handcraft-view camera into reference_goal.png, in-process.
+    """Render tidy.json from the calibrated camera into reference_goal.png, in-process.
     Returns the object count, or -1 if there is no tidy.json."""
     src = folder / f"{GOAL_ARRANGEMENT}.json"
     if not src.is_file():
         return -1
     mod = RND.load_reference_module()
+    calibration = mod.preview._load_robotwin_camera_calibration(calibration_path.resolve())
     tidy = json.loads(src.read_text())
     ts = RND.build_scene_with_tidy_loader(tidy, tidy.get("table_texture"))
-    camera, _ = RND.add_handcraft_camera(ts, near, far, camera_name)
+    camera, _ = RND.add_calibrated_camera(mod, ts, calibration["camera"], near, far, camera_name)
     ts.scene.update_render()
     capture = mod.capture_camera(camera)
     Image.fromarray(capture["rgb"]).save(folder / GOAL_IMAGE_NAME)
@@ -184,7 +187,7 @@ def main() -> None:
         "calibration_path": calibration_path,
     }
 
-    print(f"[export_v2] {root}  ({len(folders)} scene folder(s))")
+    print(f"[export_v1] {root}  ({len(folders)} scene folder(s))")
     n_scene = n_capture = n_goal = n_err = 0
     for folder in folders:
         rel = "/".join(folder.parts[-2:])  # e.g. "office_desk/001" — readable, always defined
@@ -225,7 +228,7 @@ def main() -> None:
         else:
             print(f"  [skip]    {rel}: no {GOAL_ARRANGEMENT}.json")
 
-    print(f"[export_v2] done — {n_scene} scene.json, {n_capture} capture set(s), {n_goal} {GOAL_IMAGE_NAME}"
+    print(f"[export_v1] done — {n_scene} scene.json, {n_capture} capture set(s), {n_goal} {GOAL_IMAGE_NAME}"
           + (f", {n_err} error(s)" if n_err else ""))
 
 

@@ -11,10 +11,10 @@ so the output directory ends up holding the full capture set the pipeline consum
 
 Usage
 -----
-    python tools/tidy_to_organize_it.py <v0_scene.json> <out_dir>
+    python tools/deprecated/tidy_to_organize_it.py <v0_scene.json> <out_dir>
 
     # e.g. plate_fork_messy -> .../tidy_data_rolling/data/plate_fork_1
-    python tools/tidy_to_organize_it.py \
+    python tools/deprecated/tidy_to_organize_it.py \
         data/tidy_scene_v0/plate_fork_messy.json \
         /home/hjs/.../tidy_data_rolling/data/plate_fork_1
 
@@ -30,7 +30,8 @@ import sys
 from pathlib import Path
 
 TOOLS_DIR = Path(__file__).resolve().parent
-EXPORT_SCRIPT = TOOLS_DIR / "export_to_organize_it.py"
+ACTIVE_TOOLS_DIR = TOOLS_DIR.parent
+EXPORT_SCRIPT = ACTIVE_TOOLS_DIR / "export_to_organize_it.py"
 RENDER_SCRIPT = TOOLS_DIR / "render_organize_it_scene.py"
 
 
