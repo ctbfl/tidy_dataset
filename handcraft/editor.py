@@ -350,7 +350,7 @@ class SceneEditor:
         factor = float(np.mean(scale / base_scale))
         return mn * factor, mx * factor
 
-    def pen_in_holder(self, mover_id: str, holder_id: str) -> None:
+    def pen_in_holder(self, mover_id: str, holder_id: str, select: bool = True) -> None:
         if mover_id == holder_id:
             raise ValueError("moving object and holder must be different")
         if mover_id not in self.objects:
@@ -378,8 +378,9 @@ class SceneEditor:
         bottom = corners[np.isclose(corners[:, 2], corners[:, 2].min())].mean(axis=0)
         mover.set_pose(sapien.Pose(target - bottom, q))
         self._free_settle(mover)
-        self.selected = mover_id
-        self.selected_ids = {mover_id}
+        if select:
+            self.selected = mover_id
+            self.selected_ids = {mover_id}
 
     # -- editing ---------------------------------------------------------- #
     def place(self, asset_id: str, x: int, y: int, slot: str | None = None) -> str | None:

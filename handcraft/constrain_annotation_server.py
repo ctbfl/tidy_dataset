@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import os
 import random
 import sys
 import threading
@@ -11,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import sapien.core as sapien
 import uvicorn
-from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from PIL import Image
 
@@ -25,7 +26,8 @@ from objects import Asset, spawn  # noqa: E402
 from preview import PreviewRenderer  # noqa: E402
 from scene import LIBRARY  # noqa: E402
 
-DATASET_DIR = HERE.parent / "data" / "organize_it_dataset_v2"
+DATASET_DIR = Path(os.environ.get("TIDY_DATASET_DIR", HERE.parent / "data" / "organize_it_dataset_v2"))
+GLOBAL_AVAILABLE_ASSETS_PATH = DATASET_DIR / "available_assets.json"
 GPU = threading.Lock()
 TRANS_STEP = 0.01
 TRANS_FINE = 0.002
@@ -37,6 +39,9 @@ DELETE_RELATION = "delete_relation"
 KEEP_RELATION = "keep_relation"
 
 previews = PreviewRenderer()
+ENABLED_ASSET_IDS = {asset.id for asset in LIBRARY if LIBRARY.is_enabled(asset.id)}
+SOURCES = sorted({asset.source for asset in LIBRARY if asset.id in ENABLED_ASSET_IDS})
+TAGS = sorted({tag for asset in LIBRARY if asset.id in ENABLED_ASSET_IDS for tag in asset.tags})
 
 
 class IncompleteRelation(ValueError):
@@ -58,6 +63,10 @@ def _constraints_dir(scenario: str, variation: str) -> Path:
     return _variation_dir(scenario, variation) / "template" / "constraints"
 
 
+def _variation_info_path(scenario: str, variation: str) -> Path:
+    return _variation_dir(scenario, variation) / "template" / "info.json"
+
+
 def _constraint_path(scenario: str, variation: str, name: str) -> Path:
     path = (_constraints_dir(scenario, variation) / f"{Path(name).stem}.json").resolve()
     if path.parent != _constraints_dir(scenario, variation).resolve():
@@ -66,10 +75,86 @@ def _constraint_path(scenario: str, variation: str, name: str) -> Path:
 
 
 def _read_available_assets(scenario: str, variation: str) -> dict:
+    group_ids = _read_variation_asset_group_ids(scenario, variation)
+    if not group_ids:
+        return {"version": 1, "available_assets": {}}
+    global_assets = _read_global_available_assets()["available_assets"]
+    missing = [group_id for group_id in group_ids if group_id not in global_assets]
+    if missing:
+        raise ValueError(f"unknown assets_group: {missing[0]}")
+    return {"version": 1, "available_assets": {group_id: global_assets[group_id] for group_id in group_ids}}
+
+
+def _read_global_available_assets() -> dict:
+    return _normalize_available_assets(json.loads(GLOBAL_AVAILABLE_ASSETS_PATH.read_text()))
+
+
+def _read_variation_asset_group_ids(scenario: str, variation: str) -> list[str]:
     path = _available_assets_path(scenario, variation)
     if not path.is_file():
-        return {"version": 1, "available_assets": {}}
-    return json.loads(path.read_text())
+        return []
+    data = json.loads(path.read_text())
+    if "assets_group" in data:
+        return [str(group_id) for group_id in data["assets_group"]]
+    if "available_assets" in data:
+        return list(_normalize_available_assets(data)["available_assets"])
+    raise ValueError(f"{path} missing assets_group")
+
+
+def _write_variation_asset_group_ids(scenario: str, variation: str, group_ids: list[str]) -> str:
+    path = _available_assets_path(scenario, variation)
+    if not path.parent.is_dir():
+        raise FileNotFoundError(path.parent)
+    path.write_text(json.dumps({"version": 1, "assets_group": group_ids}, indent=2, ensure_ascii=False))
+    return str(path)
+
+
+def _normalize_available_assets(payload: dict) -> dict:
+    raw_categories = payload.get("available_assets", {})
+    if not isinstance(raw_categories, dict):
+        raise ValueError("available_assets must be an object")
+
+    categories = {}
+    for category_id, category in raw_categories.items():
+        category_id = str(category_id).strip()
+        if not category_id:
+            raise ValueError("category_id cannot be empty")
+        slot_count = int(category.get("slot_count", 1))
+        if slot_count < 1:
+            raise ValueError(f"{category_id}: slot_count must be >= 1")
+
+        entries = []
+        seen_entries = set()
+        for entry in category.get("entries", []):
+            if not isinstance(entry, list) or len(entry) != slot_count:
+                raise ValueError(f"{category_id}: every entry must have {slot_count} slots")
+            clean = [str(asset_id).strip() for asset_id in entry]
+            if any(not asset_id for asset_id in clean):
+                continue
+            missing = [asset_id for asset_id in clean if asset_id not in LIBRARY.assets]
+            if missing:
+                raise ValueError(f"{category_id}: unknown asset_id {missing[0]}")
+            disabled = [asset_id for asset_id in clean if asset_id not in ENABLED_ASSET_IDS]
+            if disabled:
+                raise ValueError(f"{category_id}: disabled asset_id {disabled[0]}")
+            if len(set(clean)) != len(clean):
+                raise ValueError(f"{category_id}: duplicate asset_id inside one set")
+            key = tuple(clean)
+            if key in seen_entries:
+                raise ValueError(f"{category_id}: duplicate asset set")
+            seen_entries.add(key)
+            entries.append(clean)
+
+        categories[category_id] = {"slot_count": slot_count, "entries": entries}
+    return {"version": 1, "available_assets": categories}
+
+
+def _read_variation_info(scenario: str, variation: str) -> dict:
+    path = _variation_info_path(scenario, variation)
+    data = json.loads(path.read_text()) if path.is_file() else {}
+    data.setdefault("scene_description", "")
+    data.setdefault("user_note", "")
+    return data
 
 
 def _list_scenarios() -> list[dict]:
@@ -117,6 +202,9 @@ class ConstraintStudio:
         self.variation = "after_meal_cleanup"
         self.template_name = "draft"
         self.user_prompt = ""
+        self.scene_description = ""
+        self.user_note = ""
+        self.variation_info = {}
         self.available = {}
         self.object_sets: list[dict] = []
         self.sample_entry_index: dict[str, list[int]] = {}
@@ -139,6 +227,9 @@ class ConstraintStudio:
     def load_variation(self, scenario: str, variation: str, clear: bool = True) -> None:
         self.scenario = Path(scenario).stem
         self.variation = Path(variation).stem
+        self.variation_info = _read_variation_info(self.scenario, self.variation)
+        self.scene_description = str(self.variation_info["scene_description"])
+        self.user_note = str(self.variation_info["user_note"])
         self.available = _read_available_assets(self.scenario, self.variation).get("available_assets", {})
         if clear:
             self.object_sets = []
@@ -147,7 +238,7 @@ class ConstraintStudio:
             self.constraints = []
             self.placed_keys.clear()
             self.template_name = "draft"
-            self.user_prompt = ""
+            self.user_prompt = self.scene_description
         self._rebuild_scene()
 
     def list_constraint_templates(self) -> list[str]:
@@ -170,9 +261,14 @@ class ConstraintStudio:
 
     def load_template(self, name: str) -> None:
         data = json.loads(_constraint_path(self.scenario, self.variation, name).read_text())
+        object_sets = [{"category": str(s["category"])} for s in data.get("object_sets", [])]
+        for object_set in object_sets:
+            category = object_set["category"]
+            if category not in self.available:
+                raise ValueError(f"{Path(name).stem}: category is not enabled for this variation: {category}")
         self.template_name = Path(name).stem
-        self.user_prompt = str(data.get("user_prompt", ""))
-        self.object_sets = [{"category": str(s["category"])} for s in data.get("object_sets", [])]
+        self.user_prompt = str(data.get("user_prompt", self.scene_description))
+        self.object_sets = object_sets
         self.selection_constraints = [
             self._normalize_selection_constraint(c)
             for c in data.get("selection_constraints", [])
@@ -189,6 +285,17 @@ class ConstraintStudio:
         path.write_text(json.dumps(self.annotation(), indent=2, ensure_ascii=False))
         return str(path)
 
+    def save_user_note(self, value: str) -> str:
+        self.user_note = str(value)
+        self.variation_info["user_note"] = self.user_note
+        path = _variation_info_path(self.scenario, self.variation)
+        path.write_text(json.dumps(self.variation_info, indent=2, ensure_ascii=False))
+        return str(path)
+
+    def save_user_prompt(self, value: str) -> str:
+        self.user_prompt = str(value)
+        return self.save_template(self.template_name)
+
     def new_template(self, name: str) -> str:
         self.template_name = Path(name).stem
         if not self.template_name:
@@ -200,7 +307,7 @@ class ConstraintStudio:
         self.sample_entry_index = {}
         self.selection_constraints = []
         self.constraints = []
-        self.user_prompt = ""
+        self.user_prompt = self.scene_description
         self.placed_keys.clear()
         self._rebuild_scene()
         return self.save_template(self.template_name)
@@ -1218,7 +1325,10 @@ class ConstraintStudio:
                 try:
                     writes = self._relation_writes(relation)
                     self._apply_relation(relation, use_jitter)
-                    self._apply_preview(set(writes), settle_keys)
+                    if relation["type"] == "pen_in_holder":
+                        self._apply_pen_in_holder_preview(relation)
+                    else:
+                        self._apply_preview(set(writes), settle_keys)
                 except IncompleteRelation as exc:
                     self.relation_incomplete[i] = str(exc)
                 except ValueError as exc:
@@ -1540,6 +1650,14 @@ class ConstraintStudio:
         self._settle_keys_by_support_order(changed_keys | (set(keys) & settle_keys), changed_keys | settle_keys)
         self.editor.scene.update_render()
 
+    def _apply_pen_in_holder_preview(self, relation: dict) -> None:
+        holder_key = _ref_key(relation["holder"])
+        target_key = _ref_key(self._single_target_from(relation, "holder"))
+        holder_sid = self._ensure_spawned(holder_key)
+        target_sid = self._ensure_spawned(target_key)
+        self.editor.pen_in_holder(target_sid, holder_sid, select=False)
+        self.editor.scene.update_render()
+
     def key(self, name: str, fine: bool = False, relation_index: int | None = None) -> None:
         if name not in "wasdqe":
             return
@@ -1711,6 +1829,8 @@ class ConstraintStudio:
     def _relation_refs_for_load_order(self, relation: dict) -> list[dict]:
         if relation.get("type") == "on_top_of" and relation.get("anchor"):
             return [relation["anchor"], *self._targets_from_relation(relation, "anchor")]
+        if relation.get("type") == "pen_in_holder" and relation.get("holder"):
+            return [relation["holder"], *self._targets_from_relation(relation, "holder")]
         return self._relation_refs(relation)
 
     def _relation_key_set(self) -> set[str]:
@@ -1736,6 +1856,9 @@ class ConstraintStudio:
             "scenario": self.scenario,
             "variation": self.variation,
             "template_name": self.template_name,
+            "user_note": self.user_note,
+            "user_prompt": self.user_prompt,
+            "scene_description": self.scene_description,
             "available_categories": list(self.available),
             "objects": records,
             "sample_entry_index": self.sample_entry_index,
@@ -1768,7 +1891,25 @@ def index():
 
 @app.get("/meta")
 def meta():
-    return {"scenarios": _list_scenarios()}
+    return {"sources": SOURCES, "tags": TAGS, "scenarios": _list_scenarios()}
+
+
+@app.get("/assets")
+def assets(search: str = "", tag: str = "", source: str = ""):
+    search = search.lower()
+    out = []
+    for asset in LIBRARY:
+        if asset.id not in ENABLED_ASSET_IDS:
+            continue
+        search_blob = " ".join([asset.id, asset.label, *asset.tags]).lower()
+        if search and search not in search_blob:
+            continue
+        if tag and tag not in asset.tags:
+            continue
+        if source and asset.source != source:
+            continue
+        out.append({"id": asset.id, "label": asset.label, "source": asset.source, "tags": list(asset.tags)})
+    return out
 
 
 @app.get("/preview")
@@ -1776,6 +1917,32 @@ def preview(asset_id: str):
     with GPU:
         body = previews.image_bytes(asset_id)
     return Response(body, media_type="image/png")
+
+
+@app.get("/available_assets")
+def load_available_assets(scenario: str, variation: str):
+    data = _read_global_available_assets()
+    data["assets_group"] = _read_variation_asset_group_ids(scenario, variation)
+    return data
+
+
+@app.post("/available_assets")
+def save_available_assets(scenario: str, variation: str, payload: dict = Body(...)):
+    data = _normalize_available_assets(payload)
+    group_ids = [str(group_id) for group_id in payload.get("assets_group", [])]
+    if len(set(group_ids)) != len(group_ids):
+        raise ValueError("assets_group must not contain duplicates")
+    missing = [group_id for group_id in group_ids if group_id not in data["available_assets"]]
+    if missing:
+        raise ValueError(f"unknown assets_group: {missing[0]}")
+    GLOBAL_AVAILABLE_ASSETS_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    variation_path = _write_variation_asset_group_ids(scenario, variation, group_ids)
+    return {
+        "saved": str(GLOBAL_AVAILABLE_ASSETS_PATH),
+        "variation_saved": variation_path,
+        "category_count": len(data["available_assets"]),
+        "enabled_count": len(group_ids),
+    }
 
 
 @app.websocket("/ws")
@@ -1794,6 +1961,12 @@ async def ws(socket: WebSocket):
                         studio.load_template(msg["name"])
                     elif kind == "save_template":
                         path = studio.save_template(msg["name"])
+                        await socket.send_json({"type": "saved", "path": path})
+                    elif kind == "save_user_note":
+                        path = studio.save_user_note(msg["value"])
+                        await socket.send_json({"type": "saved", "path": path})
+                    elif kind == "save_user_prompt":
+                        path = studio.save_user_prompt(msg["value"])
                         await socket.send_json({"type": "saved", "path": path})
                     elif kind == "new_template":
                         path = studio.new_template(msg["name"])

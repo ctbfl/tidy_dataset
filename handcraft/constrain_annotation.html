@@ -8,21 +8,34 @@
   * { box-sizing: border-box; }
   body { margin: 0; height: 100vh; background: #15161a; color: #dde1e8;
          font-family: ui-sans-serif, system-ui, sans-serif; display: flex; overflow: hidden; }
-  button, input, select { font: inherit; }
+  button, input, select, textarea { font: inherit; }
   #left { width: 330px; background: #1d2027; border-right: 1px solid #303640; display: flex; flex-direction: column; }
   #center { flex: 1; min-width: 0; background: #0c0d10; display: flex; flex-direction: column; }
   #right { width: 420px; background: #1d2027; border-left: 1px solid #303640; display: flex; flex-direction: column; }
   .bar { padding: 10px; display: grid; gap: 7px; border-bottom: 1px solid #303640; background: #20242b; }
   .row { display: flex; gap: 7px; align-items: center; }
   label { color: #9aa3b2; font-size: 12px; }
-  select, input { min-width: 0; background: #11141a; color: #dde1e8; border: 1px solid #3a414d; border-radius: 4px; padding: 7px; }
+  select, input, textarea { min-width: 0; background: #11141a; color: #dde1e8; border: 1px solid #3a414d; border-radius: 4px; padding: 7px; }
+  textarea { resize: vertical; line-height: 1.35; }
   button { border: none; border-radius: 4px; padding: 7px 10px; color: #fff; background: #3d526f; cursor: pointer; }
   button:hover { background: #496381; }
   button.danger { background: #633a36; }
   button.danger:hover { background: #7a453f; }
   button.selection { background: #e0a126; color: #18120a; }
   button.selection:hover { background: #f0b73d; }
-  #status { min-height: 18px; color: #91c4a7; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hidden { display: none !important; }
+  #status, #assetStatus { min-height: 18px; color: #91c4a7; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #assetStatus { white-space: normal; overflow-wrap: anywhere; }
+  .mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .mode-toggle button { background: #303848; }
+  .mode-toggle button.active { background: #3d526f; }
+  #assetControls, #assetFilters { gap: 8px; }
+  #assetControls .row { align-items: stretch; }
+  #assetControls .row label { width: 58px; padding-top: 8px; }
+  #assetControls input, #assetControls select { width: 100%; }
+  #assetFilters input, #assetFilters select { width: 100%; }
+  #saveAssets { background: #2f6b4e; }
+  #saveAssets:hover { background: #3a8762; }
 
   #categories { overflow: auto; padding: 10px; }
   .category { margin-bottom: 10px; border: 1px solid #303640; border-radius: 6px; overflow: hidden; background: #171a20; }
@@ -42,8 +55,11 @@
   .dot.on { background: #3bd26f; border-color: #3bd26f; box-shadow: 0 0 6px rgba(59,210,111,0.45); }
   .object-row .danger { width: 24px; height: 24px; padding: 0; }
 
+  #noteBar { display: flex; gap: 8px; align-items: center; padding: 10px; background: #20242b; border-bottom: 1px solid #303640; }
+  #noteBar input { flex: 1; }
   #topbar { display: flex; gap: 8px; align-items: center; padding: 10px; background: #20242b; border-bottom: 1px solid #303640; }
   #topbar input { width: 170px; }
+  #userPrompt { flex: 1; width: auto; min-width: 220px; min-height: 52px; }
   #randomize { margin-left: auto; }
   #stage { position: relative; flex: 1; display: flex; min-height: 0; }
   #scene { margin: auto; max-width: 100%; max-height: 100%; cursor: crosshair; }
@@ -91,26 +107,86 @@
   .toggle button.selection { background: #4a3d25; color: #d7b56b; }
   .toggle button.selection:hover { background: #5b4828; color: #f0c46a; }
   .toggle button.selection.active { background: #e0a126; color: #18120a; }
+
+  #assetMain { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; background: #17191f; }
+  #assetCategories { display: block; }
+  .asset-category { background: #20242b; border: 1px solid #303640; border-radius: 6px; margin-bottom: 12px; overflow: hidden; }
+  .asset-category.disabled { opacity: 0.68; }
+  .asset-category-head { display: grid; grid-template-columns: 24px minmax(180px, 1fr) 90px auto; gap: 8px;
+                         align-items: center; padding: 10px; background: #252a33; }
+  .asset-entry-grid { padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, 110px); gap: 9px; align-items: start; }
+  .asset-entry { width: 110px; background: #13161c; border: 1px solid #2e3540; border-radius: 5px; padding: 6px; display: grid; gap: 6px; }
+  .asset-entry.empty { border-style: dashed; }
+  .asset-slot { position: relative; width: 96px; height: 96px; border: 1px dashed #4b5565; border-radius: 4px; display: grid;
+                place-items: center; padding: 4px; background: #191d24; cursor: pointer; }
+  .asset-slot:hover, .asset-slot.hot { border-color: #d9bd65; background: #20232a; }
+  .asset-slot img { width: 100%; height: 100%; object-fit: cover; background: #0c0e12; border-radius: 3px; }
+  .asset-empty-thumb { width: 100%; height: 100%; border-radius: 3px; background: #0c0e12; display: grid;
+                       place-items: center; color: #5f6876; font-size: 22px; }
+  .asset-slot-remove { position: absolute; left: -6px; top: -6px; width: 20px; height: 20px; border-radius: 50%;
+                       border: 1px solid rgba(255,255,255,0.65); background: #b33b32; color: #fff; line-height: 18px;
+                       text-align: center; font-size: 14px; padding: 0; cursor: pointer; display: none;
+                       box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+  .asset-slot:hover .asset-slot-remove { display: block; }
+  .asset-slot-id { position: absolute; left: 0; top: calc(100% + 5px); display: none; z-index: 5;
+                   min-width: 220px; max-width: 720px; padding: 5px 8px; border-radius: 8px;
+                   background: rgba(13,15,20,0.92); color: #eef1f6; border: 1px solid rgba(217,189,101,0.55);
+                   font-size: 10px; line-height: 1.25; white-space: normal; overflow-wrap: anywhere;
+                   box-shadow: 0 3px 10px rgba(0,0,0,0.35); pointer-events: none; }
+  .asset-slot:hover .asset-slot-id { display: block; }
+  .empty-note { color: #798494; font-size: 12px; text-align: center; padding: 16px; }
+  #assetRight { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #assetBrowser { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px; gap: 8px; }
+  #selectedAsset { font-size: 12px; color: #d9bd65; min-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #assetCount { font-size: 12px; color: #8f98a8; }
+  #assetGrid { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(3, 1fr);
+               gap: 7px; align-content: start; }
+  .asset-cell { position: relative; aspect-ratio: 1; background: #0c0e12; border-radius: 5px; border: 2px solid transparent;
+                cursor: grab; }
+  .asset-cell:hover, .asset-cell.selected { border-color: #d9bd65; }
+  .asset-cell img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .asset-cell-label { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; color: #dce1ea;
+                      background: rgba(12,14,18,0.78); text-align: center; padding: 1px 2px; overflow: hidden;
+                      text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 </style>
 </head>
 <body>
   <aside id="left">
     <div class="bar">
+      <div class="mode-toggle">
+        <button id="constraintMode" class="active">Constraints</button>
+        <button id="assetMode">Assets</button>
+      </div>
       <div class="row"><label>Scenario</label><select id="scenario"></select></div>
       <div class="row"><label>Variation</label><select id="variation"></select></div>
-      <button id="loadVariation">Load Variation</button>
-      <div id="status"></div>
+      <div id="constraintControls" class="bar" style="padding:0;border:0;background:transparent">
+        <button id="loadVariation">Load Variation</button>
+        <div id="status"></div>
+      </div>
+      <div id="assetControls" class="bar hidden" style="padding:0;border:0;background:transparent">
+        <div class="row"><label>Category</label><input id="assetCategoryId" placeholder="category_id" /></div>
+        <div class="row"><label>Slots</label><input id="assetSlotCount" type="number" min="1" value="1" /></div>
+        <button id="addAssetCategory">Add Category</button>
+        <button id="saveAssets">Save</button>
+        <div id="assetStatus"></div>
+      </div>
     </div>
     <div id="categories"></div>
   </aside>
 
   <main id="center">
+    <div id="noteBar">
+      <label>Note</label>
+      <input id="userNote" />
+    </div>
     <div id="topbar">
       <label>Template</label>
       <select id="templateList"><option value="">load saved...</option></select>
       <button id="newTemplate">New</button>
       <button id="loadTemplate">Load</button>
       <button id="saveTemplate">Save</button>
+      <label>Prompt</label>
+      <textarea id="userPrompt" rows="2"></textarea>
       <button id="randomize">Randomize</button>
     </div>
     <div id="stage">
@@ -119,20 +195,37 @@
       <div id="hint">drag left image onto table · click select · drag box select · right-click selected object(s) to add relation</div>
       <div id="menu"></div>
     </div>
+    <div id="assetMain" class="hidden">
+      <div id="assetCategories"></div>
+    </div>
   </main>
 
   <aside id="right">
-    <div class="bar">
-      <div class="row">
-        <b>Relations</b>
-        <div class="toggle" style="margin-left:auto">
-          <button id="layoutMode" class="active">Layout</button>
-          <button id="selectionMode" class="selection">Selection</button>
+    <div id="constraintRight">
+      <div class="bar">
+        <div class="row">
+          <b>Relations</b>
+          <div class="toggle" style="margin-left:auto">
+            <button id="layoutMode" class="active">Layout</button>
+            <button id="selectionMode" class="selection">Selection</button>
+          </div>
+          <button id="refresh">Reapply</button>
         </div>
-        <button id="refresh">Reapply</button>
+      </div>
+      <div id="relations"></div>
+    </div>
+    <div id="assetRight" class="hidden">
+      <div id="assetFilters" class="bar">
+        <input id="assetSearch" placeholder="id / label / tag..." />
+        <select id="assetTag"><option value="">all tags</option></select>
+        <select id="assetSource"><option value="">all sources</option></select>
+        <div id="selectedAsset"></div>
+        <div id="assetCount"></div>
+      </div>
+      <div id="assetBrowser">
+        <div id="assetGrid"></div>
       </div>
     </div>
-    <div id="relations"></div>
   </aside>
 
 <script>
@@ -152,12 +245,25 @@ let boxSelect = null;
 let suppressClick = false;
 let dragKey = null;
 let pendingRefPick = null;
+let appMode = 'constraints';
+let assetConfig = { version: 1, available_assets: {}, assets_group: [] };
+let selectedAssetId = null;
+let draggedAssetId = null;
+let assetResults = [];
+let assetSearchTimer = null;
+let availableAssetsDirty = false;
+let pendingTemplateReload = null;
+let forcePromptSync = false;
 const DEFAULT_HINT = 'drag left image onto table · click select · drag box select · right-click selected object(s) to add relation';
 const LOCAL_IDS = 'abcdefghijklmnopqrstuvwxyz';
 
 function setStatus(text, error = false) {
   $('status').textContent = text;
   $('status').style.color = error ? '#e09a8d' : '#91c4a7';
+}
+function setAssetStatus(text, error = false) {
+  $('assetStatus').textContent = text;
+  $('assetStatus').style.color = error ? '#e09a8d' : '#91c4a7';
 }
 function setHint(text) {
   $('hint').textContent = text || DEFAULT_HINT;
@@ -172,11 +278,64 @@ ws.onmessage = (ev) => {
   if (msg.type === 'randomized') { setStatus('randomized sets'); return; }
   if (msg.type !== 'frame') return;
   img.src = 'data:image/jpeg;base64,' + msg.image;
+  const previousTemplate = state ? state.template_name : null;
   state = msg.state;
+  syncTextInputs(previousTemplate !== state.template_name || forcePromptSync);
+  forcePromptSync = false;
   renderTemplateList();
   renderCategories();
   renderRelations();
+  if (pendingTemplateReload) {
+    const name = pendingTemplateReload;
+    pendingTemplateReload = null;
+    if ((state.templates || []).includes(name)) {
+      send({ type: 'load_template', name });
+    } else {
+      setStatus(`template not found after reload: ${name}`, true);
+    }
+  }
 };
+
+function syncTextInputs(forcePrompt = false) {
+  const note = $('userNote');
+  const prompt = $('userPrompt');
+  if (document.activeElement !== note) note.value = state.user_note || '';
+  if (forcePrompt || document.activeElement !== prompt) prompt.value = state.user_prompt || '';
+}
+
+function setMode(mode) {
+  if (appMode === mode) return;
+  appMode = mode;
+  $('constraintMode').classList.toggle('active', mode === 'constraints');
+  $('assetMode').classList.toggle('active', mode === 'assets');
+  $('constraintControls').classList.toggle('hidden', mode !== 'constraints');
+  $('categories').classList.toggle('hidden', mode !== 'constraints');
+  $('noteBar').classList.toggle('hidden', mode !== 'constraints');
+  $('topbar').classList.toggle('hidden', mode !== 'constraints');
+  $('stage').classList.toggle('hidden', mode !== 'constraints');
+  $('constraintRight').classList.toggle('hidden', mode !== 'constraints');
+  $('assetControls').classList.toggle('hidden', mode !== 'assets');
+  $('assetMain').classList.toggle('hidden', mode !== 'assets');
+  $('assetRight').classList.toggle('hidden', mode !== 'assets');
+  hideMenu();
+  if (mode === 'assets') {
+    loadAssetConfig();
+    loadAssets();
+    return;
+  }
+  if (availableAssetsDirty) reloadConstraintsAfterAssetSave();
+}
+
+function reloadConstraintsAfterAssetSave() {
+  availableAssetsDirty = false;
+  const scenario = $('scenario').value;
+  const variation = $('variation').value;
+  const sameVariation = state && state.scenario === scenario && state.variation === variation;
+  const templateName = sameVariation && (state.templates || []).includes(state.template_name) ? state.template_name : null;
+  pendingTemplateReload = templateName;
+  setStatus(templateName ? `reloading ${templateName}` : 'reloading variation');
+  send({ type: 'load_variation', scenario, variation });
+}
 
 function renderTemplateList() {
   $('templateList').innerHTML = '<option value="">load saved...</option>';
@@ -707,9 +866,286 @@ function showSetMenu(x, y, ref) {
   menu.style.display = 'block';
 }
 
+function assetCategoryKeys() {
+  return Object.keys(assetConfig.available_assets);
+}
+
+function enabledAssetGroups() {
+  return new Set(assetConfig.assets_group || []);
+}
+
+function setAssetGroupEnabled(groupId, enabled) {
+  const groups = enabledAssetGroups();
+  if (enabled) groups.add(groupId);
+  else groups.delete(groupId);
+  assetConfig.assets_group = assetCategoryKeys().filter((key) => groups.has(key));
+}
+
+function assetCategoryEntries(category) {
+  const entries = category.entries || [];
+  const blank = Array.from({ length: category.slot_count }, () => '');
+  if (!entries.length || entries[entries.length - 1].every(Boolean)) return [...entries, blank];
+  return entries;
+}
+
+function storeVisibleAssetEntries(category, visibleEntries) {
+  category.entries = visibleEntries.filter((entry) => entry.some(Boolean));
+}
+
+function duplicateAssetEntryIndex(entries, target, targetIndex) {
+  if (!target.every(Boolean)) return -1;
+  return entries.findIndex((entry, index) =>
+    index !== targetIndex && entry.every(Boolean) && entry.length === target.length &&
+    entry.every((assetId, slotIndex) => assetId === target[slotIndex])
+  );
+}
+
+function renderAssetCategories() {
+  const box = $('assetCategories');
+  box.innerHTML = '';
+  const keys = assetCategoryKeys();
+  if (!keys.length) {
+    const note = document.createElement('div');
+    note.className = 'empty-note';
+    note.textContent = 'No categories yet.';
+    box.appendChild(note);
+    return;
+  }
+  for (const key of keys) renderAssetCategory(box, key, assetConfig.available_assets[key]);
+}
+
+function renderAssetCategory(parent, key, category) {
+  const isEnabled = enabledAssetGroups().has(key);
+  const wrap = document.createElement('div');
+  wrap.className = 'asset-category' + (isEnabled ? '' : ' disabled');
+
+  const head = document.createElement('div');
+  head.className = 'asset-category-head';
+  const enabled = document.createElement('input');
+  enabled.type = 'checkbox';
+  enabled.checked = isEnabled;
+  enabled.title = 'enable this group for current variation';
+  enabled.addEventListener('change', () => {
+    setAssetGroupEnabled(key, enabled.checked);
+    renderAssetCategories();
+  });
+  const name = document.createElement('input');
+  name.value = key;
+  name.placeholder = 'category_id';
+  name.addEventListener('change', () => renameAssetCategory(key, name.value));
+  const count = document.createElement('input');
+  count.type = 'number';
+  count.min = '1';
+  count.value = category.slot_count;
+  count.addEventListener('change', () => resizeAssetCategory(key, Number(count.value)));
+  const del = document.createElement('button');
+  del.className = 'danger';
+  del.textContent = 'Delete';
+  del.addEventListener('click', () => {
+    const ok = confirm(
+      `This will delete "${key}" from the global available assets groups.\n\n` +
+      'Make sure no other template/model depends on this category before deleting it.'
+    );
+    if (!ok) return;
+    delete assetConfig.available_assets[key];
+    setAssetGroupEnabled(key, false);
+    renderAssetCategories();
+  });
+  head.append(enabled, name, count, del);
+  wrap.appendChild(head);
+  if (!isEnabled) {
+    parent.appendChild(wrap);
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'asset-entry-grid';
+  const visible = assetCategoryEntries(category);
+  visible.forEach((entry, entryIndex) => {
+    const card = document.createElement('div');
+    card.className = 'asset-entry' + (entry.every((value) => !value) ? ' empty' : '');
+    entry.forEach((assetId, slotIndex) => {
+      card.appendChild(renderAssetSlot(key, category, visible, entryIndex, slotIndex, assetId));
+    });
+    grid.appendChild(card);
+  });
+  wrap.appendChild(grid);
+  parent.appendChild(wrap);
+}
+
+function renderAssetSlot(key, category, visibleEntries, entryIndex, slotIndex, assetId) {
+  const slot = document.createElement('div');
+  slot.className = 'asset-slot';
+  slot.addEventListener('dragover', (ev) => {
+    ev.preventDefault();
+    slot.classList.add('hot');
+  });
+  slot.addEventListener('dragleave', () => slot.classList.remove('hot'));
+  slot.addEventListener('drop', (ev) => {
+    ev.preventDefault();
+    slot.classList.remove('hot');
+    if (draggedAssetId) fillAssetSlot(key, category, visibleEntries, entryIndex, slotIndex, draggedAssetId);
+  });
+  slot.addEventListener('click', () => {
+    if (selectedAssetId) fillAssetSlot(key, category, visibleEntries, entryIndex, slotIndex, selectedAssetId);
+  });
+
+  if (assetId) {
+    const im = document.createElement('img');
+    im.loading = 'lazy';
+    im.src = '/preview?asset_id=' + encodeURIComponent(assetId);
+    slot.appendChild(im);
+    const bubble = document.createElement('div');
+    bubble.className = 'asset-slot-id';
+    bubble.textContent = assetId;
+    slot.appendChild(bubble);
+    const remove = document.createElement('button');
+    remove.className = 'asset-slot-remove';
+    remove.textContent = '×';
+    remove.title = 'remove';
+    remove.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      fillAssetSlot(key, category, visibleEntries, entryIndex, slotIndex, '');
+    });
+    slot.appendChild(remove);
+  } else {
+    const empty = document.createElement('div');
+    empty.className = 'asset-empty-thumb';
+    empty.textContent = '+';
+    slot.appendChild(empty);
+  }
+  return slot;
+}
+
+function fillAssetSlot(key, category, visibleEntries, entryIndex, slotIndex, assetId) {
+  const nextEntry = [...visibleEntries[entryIndex]];
+  nextEntry[slotIndex] = assetId;
+  if (assetId && nextEntry.some((existing, index) => index !== slotIndex && existing === assetId)) {
+    setAssetStatus(`${assetId} is already in this set`, true);
+    return;
+  }
+  if (assetId && duplicateAssetEntryIndex(visibleEntries, nextEntry, entryIndex) >= 0) {
+    setAssetStatus(`duplicate set in ${key}`, true);
+    return;
+  }
+  visibleEntries[entryIndex][slotIndex] = assetId;
+  storeVisibleAssetEntries(category, visibleEntries);
+  assetConfig.available_assets[key] = category;
+  renderAssetCategories();
+}
+
+function renameAssetCategory(oldKey, rawNewKey) {
+  const newKey = rawNewKey.trim();
+  if (!newKey || newKey === oldKey) {
+    renderAssetCategories();
+    return;
+  }
+  if (assetConfig.available_assets[newKey]) {
+    setAssetStatus(`category exists: ${newKey}`, true);
+    renderAssetCategories();
+    return;
+  }
+  const wasEnabled = enabledAssetGroups().has(oldKey);
+  assetConfig.available_assets[newKey] = assetConfig.available_assets[oldKey];
+  delete assetConfig.available_assets[oldKey];
+  setAssetGroupEnabled(oldKey, false);
+  setAssetGroupEnabled(newKey, wasEnabled);
+  renderAssetCategories();
+}
+
+function resizeAssetCategory(key, value) {
+  const slotCount = Math.max(1, Math.floor(value || 1));
+  const category = assetConfig.available_assets[key];
+  category.slot_count = slotCount;
+  category.entries = (category.entries || []).map((entry) => {
+    const next = entry.slice(0, slotCount);
+    while (next.length < slotCount) next.push('');
+    return next;
+  }).filter((entry) => entry.every(Boolean));
+  renderAssetCategories();
+}
+
+function addAssetCategory() {
+  const categoryId = $('assetCategoryId').value.trim();
+  const slotCount = Math.max(1, Math.floor(Number($('assetSlotCount').value) || 1));
+  if (!categoryId) {
+    setAssetStatus('category_id is required', true);
+    return;
+  }
+  if (assetConfig.available_assets[categoryId]) {
+    setAssetStatus(`category exists: ${categoryId}`, true);
+    return;
+  }
+  assetConfig.available_assets[categoryId] = { slot_count: slotCount, entries: [] };
+  setAssetGroupEnabled(categoryId, true);
+  $('assetCategoryId').value = '';
+  renderAssetCategories();
+}
+
+async function loadAssetConfig() {
+  if (!$('scenario').value || !$('variation').value) return;
+  const params = new URLSearchParams({ scenario: $('scenario').value, variation: $('variation').value });
+  assetConfig = await (await fetch('/available_assets?' + params)).json();
+  assetConfig.assets_group = assetConfig.assets_group || [];
+  renderAssetCategories();
+  setAssetStatus('loaded');
+}
+
+async function saveAssetConfig() {
+  const params = new URLSearchParams({ scenario: $('scenario').value, variation: $('variation').value });
+  const resp = await fetch('/available_assets?' + params, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(assetConfig),
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    setAssetStatus(data.detail || 'save failed', true);
+    return;
+  }
+  availableAssetsDirty = true;
+  setAssetStatus(`saved ${data.category_count} groups, enabled ${data.enabled_count}`);
+  reloadConstraintsAfterAssetSave();
+}
+
+async function loadAssets() {
+  const q = new URLSearchParams({
+    search: $('assetSearch').value,
+    tag: $('assetTag').value,
+    source: $('assetSource').value,
+  });
+  assetResults = await (await fetch('/assets?' + q)).json();
+  $('assetCount').textContent = `${assetResults.length} assets`;
+  const grid = $('assetGrid');
+  grid.innerHTML = '';
+  for (const asset of assetResults) {
+    const cell = document.createElement('div');
+    cell.className = 'asset-cell' + (asset.id === selectedAssetId ? ' selected' : '');
+    cell.draggable = true;
+    cell.title = `${asset.label || asset.id}\n${asset.id}`;
+    cell.addEventListener('dragstart', () => { draggedAssetId = asset.id; });
+    cell.addEventListener('dragend', () => { draggedAssetId = null; });
+    cell.addEventListener('click', () => {
+      selectedAssetId = asset.id;
+      $('selectedAsset').textContent = `selected: ${asset.id}`;
+      loadAssets();
+    });
+    const im = document.createElement('img');
+    im.loading = 'lazy';
+    im.src = '/preview?asset_id=' + encodeURIComponent(asset.id);
+    const label = document.createElement('div');
+    label.className = 'asset-cell-label';
+    label.textContent = asset.label || asset.id;
+    cell.append(im, label);
+    grid.appendChild(cell);
+  }
+}
+
 async function loadMeta() {
   const data = await (await fetch('/meta')).json();
   meta = data.scenarios;
+  for (const source of data.sources || []) $('assetSource').add(new Option(source, source));
+  for (const tag of data.tags || []) $('assetTag').add(new Option(tag, tag));
   $('scenario').innerHTML = '';
   for (const s of meta) $('scenario').add(new Option(s.scenario, s.scenario));
   if ([...$('scenario').options].some((o) => o.value === 'dining_table')) $('scenario').value = 'dining_table';
@@ -717,18 +1153,32 @@ async function loadMeta() {
 }
 
 function renderVariations() {
+  const previous = $('variation').value;
   const found = meta.find((s) => s.scenario === $('scenario').value);
   $('variation').innerHTML = '';
   for (const v of (found ? found.variations : [])) $('variation').add(new Option(v, v));
-  if ([...$('variation').options].some((o) => o.value === 'after_meal_cleanup')) $('variation').value = 'after_meal_cleanup';
+  const options = [...$('variation').options];
+  if (options.some((o) => o.value === previous)) $('variation').value = previous;
+  else if (options.some((o) => o.value === 'after_meal_cleanup')) $('variation').value = 'after_meal_cleanup';
 }
 
-$('scenario').addEventListener('change', renderVariations);
+$('constraintMode').addEventListener('click', () => setMode('constraints'));
+$('assetMode').addEventListener('click', () => setMode('assets'));
+$('scenario').addEventListener('change', () => {
+  renderVariations();
+  if (appMode === 'assets') loadAssetConfig();
+});
+$('variation').addEventListener('change', () => {
+  if (appMode === 'assets') loadAssetConfig();
+});
 $('loadVariation').addEventListener('click', () => {
   send({ type: 'load_variation', scenario: $('scenario').value, variation: $('variation').value });
 });
 $('loadTemplate').addEventListener('click', () => {
-  if ($('templateList').value) send({ type: 'load_template', name: $('templateList').value });
+  if ($('templateList').value) {
+    forcePromptSync = true;
+    send({ type: 'load_template', name: $('templateList').value });
+  }
 });
 $('saveTemplate').addEventListener('click', () => {
   if ($('templateList').value) send({ type: 'save_template', name: $('templateList').value });
@@ -737,6 +1187,24 @@ $('newTemplate').addEventListener('click', () => {
   const name = prompt('New template name');
   if (name) send({ type: 'new_template', name });
 });
+$('userNote').addEventListener('blur', () => {
+  if (state && $('userNote').value !== (state.user_note || '')) {
+    send({ type: 'save_user_note', value: $('userNote').value });
+  }
+});
+$('userPrompt').addEventListener('blur', () => {
+  if (state && $('userPrompt').value !== (state.user_prompt || '')) {
+    send({ type: 'save_user_prompt', value: $('userPrompt').value });
+  }
+});
+$('addAssetCategory').addEventListener('click', addAssetCategory);
+$('saveAssets').addEventListener('click', saveAssetConfig);
+$('assetSearch').addEventListener('input', () => {
+  clearTimeout(assetSearchTimer);
+  assetSearchTimer = setTimeout(loadAssets, 250);
+});
+$('assetTag').addEventListener('change', loadAssets);
+$('assetSource').addEventListener('change', loadAssets);
 $('randomize').addEventListener('click', () => send({ type: 'randomize' }));
 $('refresh').addEventListener('click', () => send({ type: 'reapply' }));
 $('layoutMode').addEventListener('click', () => {
