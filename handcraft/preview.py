@@ -13,8 +13,15 @@
 from __future__ import annotations
 
 import io
+import subprocess
+import sys
 import threading
 from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+SIMULATIONS_DIR = HERE.parent / "simulations"
+if str(SIMULATIONS_DIR) not in sys.path:
+    sys.path.insert(0, str(SIMULATIONS_DIR))
 
 import numpy as np
 import sapien.core as sapien
@@ -45,12 +52,30 @@ class PreviewRenderer:
 
     def image_bytes(self, asset_id: str) -> bytes:
         out = self.path(asset_id)
-        if out.is_file():
+        if self._cache_is_fresh(asset_id, out):
             return out.read_bytes()
-        try:
-            return self._render(asset_id, out)
-        except Exception:
-            return self._placeholder
+        if self._render_in_subprocess(asset_id, out):
+            return out.read_bytes()
+        return self._placeholder
+
+    def _render_in_subprocess(self, asset_id: str, out: Path) -> bool:
+        proc = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), asset_id, str(out), str(self._size)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=12,
+            check=False,
+        )
+        return proc.returncode == 0 and out.is_file()
+
+    def _cache_is_fresh(self, asset_id: str, out: Path) -> bool:
+        if not out.is_file():
+            return False
+        asset_dir = LIBRARY[asset_id].handle.asset_dir
+        newest_asset_file = max(
+            [asset_dir.stat().st_mtime, *(p.stat().st_mtime for p in asset_dir.iterdir() if p.is_file())]
+        )
+        return out.stat().st_mtime >= newest_asset_file
 
     def _ensure_scene(self):
         if self._scene is None:
@@ -64,7 +89,7 @@ class PreviewRenderer:
 
     def _render(self, asset_id: str, out: Path) -> bytes:
         with self._lock:
-            if out.is_file():  # filled while we waited for the lock
+            if self._cache_is_fresh(asset_id, out):  # filled while we waited for the lock
                 return out.read_bytes()
             scene, camera = self._ensure_scene()
             obj = spawn(scene, LIBRARY[asset_id], asset_id)
@@ -85,3 +110,15 @@ class PreviewRenderer:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
             Image.fromarray(rgb).save(out)
             return out.read_bytes()
+
+
+def _main() -> int:
+    if len(sys.argv) != 4:
+        return 2
+    renderer = PreviewRenderer(size=int(sys.argv[3]))
+    renderer._render(sys.argv[1], Path(sys.argv[2]))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
