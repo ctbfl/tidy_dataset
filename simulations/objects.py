@@ -2,21 +2,16 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import sapien.core as sapien
 
-ORGANIZE_IT_ROOT = Path("/home/hjs/Projects/table_arrangement/organize_it_v2")
-ORGANIZE_IT_SRC = Path(os.environ.get("TIDY_ORGANIZE_IT_SRC", ORGANIZE_IT_ROOT / "src"))
-if str(ORGANIZE_IT_SRC) not in sys.path:
-    sys.path.insert(0, str(ORGANIZE_IT_SRC))
+from organize_it.assets.registry import AssetHandle, AssetRegistry
 
-from organize_it.assets.registry import AssetHandle, AssetRegistry  # noqa: E402
-
-ASSET_LIBRARY_ROOT = Path(os.environ.get("TIDY_ASSET_LIBRARY_ROOT", ORGANIZE_IT_ROOT / "data" / "asset_library"))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+ASSET_LIBRARY_ROOT = Path(os.environ.get("TIDY_ASSET_LIBRARY_ROOT", REPO_ROOT / "handcraft_bundle" / "asset_library"))
 ASSET_JSON_BACKUP_DIR = "asset_json_backup"
 NONCONVEX_CONTAINER_TAGS = {"holder"}
 

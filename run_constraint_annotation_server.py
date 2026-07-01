@@ -30,11 +30,6 @@ def main() -> int:
     if not (dataset / "available_assets.json").is_file():
         raise FileNotFoundError(dataset / "available_assets.json")
 
-    bundle_src = root / "handcraft_bundle" / "src"
-    if bundle_src.is_dir():
-        os.environ["TIDY_ORGANIZE_IT_SRC"] = str(bundle_src)
-        sys.path.insert(0, str(bundle_src))
-
     os.environ["TIDY_ASSET_LIBRARY_ROOT"] = str(asset_library)
     os.environ["TIDY_DATASET_DIR"] = str(dataset)
     sys.path.insert(0, str(root / "handcraft"))

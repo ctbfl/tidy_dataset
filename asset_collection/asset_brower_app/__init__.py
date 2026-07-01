@@ -1,0 +1,2 @@
+"""Standalone Asset Viewer app."""
+

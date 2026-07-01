@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asset Preview Browser</title>
+  <link rel="stylesheet" href="/static/css/assets.css">
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div>
+        <div class="title-row">
+          <h1>Asset Preview Browser</h1>
+          <nav class="nav" aria-label="Main navigation">
+            <a class="active" href="/assets">Assets</a>
+          </nav>
+        </div>
+        <div class="path" id="catalogPath"></div>
+      </div>
+      <div class="status" id="summary"></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="controls" aria-label="Asset controls">
+      <div>
+        <label for="typeSelect">Data Source</label>
+        <select id="typeSelect"></select>
+      </div>
+      <div class="general-filter" id="generalTagFilter">
+        <label for="generalTagToggle">General Tags</label>
+        <button class="general-toggle" id="generalTagToggle" type="button" aria-expanded="false" aria-controls="generalTagMenu">
+          <span id="generalTagSummary">No tag selected</span>
+        </button>
+        <div class="general-menu" id="generalTagMenu">
+          <div class="general-tag-list" id="generalTagList"></div>
+        </div>
+      </div>
+      <div>
+        <label for="searchInput">Search</label>
+        <input id="searchInput" type="search" placeholder="asset key, model name, path">
+      </div>
+      <div class="pager">
+        <button id="prevBtn" type="button">Previous</button>
+        <button id="nextBtn" type="button">Next</button>
+        <div class="goto">
+          <label for="pageInput">Page</label>
+          <input id="pageInput" type="number" min="1" value="1">
+        </div>
+        <button class="primary" id="goBtn" type="button">Go</button>
+      </div>
+    </section>
+
+    <div class="filter-row" id="categoryTags" aria-label="Model classification filters"></div>
+    <section class="batch-controls" id="batchControls" aria-label="Batch tag controls">
+      <div class="batch-field">
+        <label for="batchTagSelect">Batch Tag</label>
+        <select id="batchTagSelect"></select>
+      </div>
+      <div class="batch-actions">
+        <button id="batchSetPageBtn" type="button">Set page</button>
+        <button id="batchClearPageBtn" type="button">Clear page</button>
+        <button class="primary" id="batchSavePageBtn" type="button" disabled>Save page</button>
+      </div>
+      <div class="batch-status" id="batchStatus"></div>
+    </section>
+    <div id="notice"></div>
+    <section class="asset-grid" id="assetGrid" aria-label="Asset previews"></section>
+
+    <div class="bottom">
+      <div class="pager">
+        <button id="prevBottomBtn" type="button">Previous</button>
+        <button id="nextBottomBtn" type="button">Next</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal hidden" id="viewerModal" role="dialog" aria-modal="true" aria-label="Asset 3D viewer">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <div>
+          <div class="viewer-title" id="viewerTitle">Asset Viewer</div>
+          <div class="viewer-meta" id="viewerMeta"></div>
+        </div>
+        <button id="viewerCloseBtn" type="button">Close</button>
+      </div>
+      <div class="viewer-mount" id="viewerMount">
+        <div class="viewer-legend" id="layerControls"></div>
+        <div class="enabled-widget" id="enabledWidget">
+          <button class="enabled-toggle" id="enabledToggleBtn" type="button" aria-pressed="true">Enabled</button>
+          <div class="enabled-status" id="enabledStatus"></div>
+        </div>
+        <div class="tag-widget" id="tagWidget">
+          <div class="tag-panel" id="assetTagPanel" aria-label="Asset tags">
+            <button class="primary tag-save" id="tagSaveBtn" type="button" disabled>Save Tags</button>
+            <div class="tag-status" id="tagStatus"></div>
+            <div class="tag-list" id="tagList"></div>
+          </div>
+          <button class="tag-toggle" id="tagToggleBtn" type="button" aria-expanded="false" aria-controls="assetTagPanel">TAG</button>
+        </div>
+        <div class="fix-widget" id="fixWidget">
+          <div class="fix-panel" id="fixPanel">
+            <div class="fix-row">
+              <button type="button" data-fix-axis="x" data-fix-dir="ccw" title="Rotate local X counterclockwise">&lt;</button>
+              <span class="fix-axis">X</span>
+              <button type="button" data-fix-axis="x" data-fix-dir="cw" title="Rotate local X clockwise">&gt;</button>
+            </div>
+            <div class="fix-row">
+              <button type="button" data-fix-axis="y" data-fix-dir="ccw" title="Rotate local Y counterclockwise">&lt;</button>
+              <span class="fix-axis">Y</span>
+              <button type="button" data-fix-axis="y" data-fix-dir="cw" title="Rotate local Y clockwise">&gt;</button>
+            </div>
+            <div class="fix-row">
+              <button type="button" data-fix-axis="z" data-fix-dir="ccw" title="Rotate local Z counterclockwise">&lt;</button>
+              <span class="fix-axis">Z</span>
+              <button type="button" data-fix-axis="z" data-fix-dir="cw" title="Rotate local Z clockwise">&gt;</button>
+            </div>
+            <button class="primary fix-save" id="fixSaveBtn" type="button">Save</button>
+            <div class="fix-status" id="fixStatus"></div>
+          </div>
+          <button class="fix-toggle" id="fixToggleBtn" type="button" aria-expanded="false" aria-controls="fixPanel">Fix</button>
+        </div>
+        <div class="viewer-hint" id="viewerHint">Loading viewer...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/assets.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+    import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+    import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
+
+    const modal = document.getElementById("viewerModal");
+    const mount = document.getElementById("viewerMount");
+    const hint = document.getElementById("viewerHint");
+    const layerControls = document.getElementById("layerControls");
+    const title = document.getElementById("viewerTitle");
+    const meta = document.getElementById("viewerMeta");
+    const closeBtn = document.getElementById("viewerCloseBtn");
+    const enabledToggleBtn = document.getElementById("enabledToggleBtn");
+    const enabledStatus = document.getElementById("enabledStatus");
+    const tagWidget = document.getElementById("tagWidget");
+    const tagPanel = document.getElementById("assetTagPanel");
+    const tagToggleBtn = document.getElementById("tagToggleBtn");
+    const tagSaveBtn = document.getElementById("tagSaveBtn");
+    const tagStatus = document.getElementById("tagStatus");
+    const tagList = document.getElementById("tagList");
+    const fixWidget = document.getElementById("fixWidget");
+    const fixToggleBtn = document.getElementById("fixToggleBtn");
+    const fixSaveBtn = document.getElementById("fixSaveBtn");
+    const fixStatus = document.getElementById("fixStatus");
+    const FALLBACK_AVAILABLE_TAGS = ["Kitchen", "Tools", "Desk", "bowl", "cup", "plate"];
+    const SCENE_TAGS = ["Kitchen", "Tools", "Desk"];
+    const SCENE_TAG_KEYS = new Set(SCENE_TAGS.map((tag) => tag.toLowerCase()));
+
+    const viewer = {
+      renderer: null,
+      scene: null,
+      camera: null,
+      controls: null,
+      object: null,
+      layers: {},
+      layerLabels: {},
+      currentItem: null,
+      baseStableRotation: null,
+      currentStableRotation: null,
+      axesBasis: null,
+      tagOriginal: [],
+      tagSelected: new Set(),
+      tagSaving: false,
+      enabledSaving: false,
+      enabledQueued: null,
+      loaded: false,
+      saving: false,
+      frame: null,
+      token: 0,
+      resizeObserver: null,
+    };
+
+    const layerConfig = [
+      { key: "visual", label: "visual mesh", kind: "visual" },
+      { key: "collision", label: "collision mesh", kind: "collision" },
+      { key: "lower", label: "lower contact", kind: "lower" },
+      { key: "upper", label: "upper support", kind: "upper" },
+      { key: "axes", label: "stable XYZ axes", kind: "axes" },
+    ];
+
+    function splitUrl(url) {
+      const idx = url.lastIndexOf("/");
+      return [url.slice(0, idx + 1), url.slice(idx + 1)];
+    }
+
+    function setViewerHint(text, visible = true) {
+      hint.textContent = text;
+      hint.classList.toggle("hidden", !visible);
+    }
+
+    function renderLayerControls() {
+      layerControls.innerHTML = layerConfig.map((layer) => {
+        const object = viewer.layers[layer.key];
+        const enabled = Boolean(object);
+        const checked = enabled && object.visible !== false;
+        const label = viewer.layerLabels[layer.key] || layer.label;
+        return `
+        <label class="layer-toggle${enabled ? "" : " disabled"}">
+          <input type="checkbox" data-layer="${layer.key}" ${checked ? "checked" : ""} ${enabled ? "" : "disabled"}>
+          <span class="legend-dot ${layer.kind}"></span>${label}
+        </label>
+      `;
+      }).join("");
+      layerControls.querySelectorAll("input[data-layer]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const object = viewer.layers[input.dataset.layer];
+          if (object) object.visible = input.checked;
+        });
+      });
+    }
+
+    function ensureViewer() {
+      if (viewer.renderer) return;
+      viewer.scene = new THREE.Scene();
+      viewer.scene.background = new THREE.Color(0xf4f6f8);
+      viewer.camera = new THREE.PerspectiveCamera(45, 1, 0.001, 1000);
+      viewer.renderer = new THREE.WebGLRenderer({ antialias: true });
+      viewer.renderer.outputColorSpace = THREE.SRGBColorSpace;
+      viewer.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      mount.appendChild(viewer.renderer.domElement);
+
+      const ambient = new THREE.HemisphereLight(0xffffff, 0x8892a0, 1.8);
+      viewer.scene.add(ambient);
+      const key = new THREE.DirectionalLight(0xffffff, 2.4);
+      key.position.set(2.8, -3.0, 4.0);
+      viewer.scene.add(key);
+
+      viewer.controls = new OrbitControls(viewer.camera, viewer.renderer.domElement);
+      viewer.controls.enableDamping = true;
+      viewer.controls.dampingFactor = 0.08;
+
+      viewer.resizeObserver = new ResizeObserver(resizeViewer);
+      viewer.resizeObserver.observe(mount);
+      resizeViewer();
+    }
+
+    function resizeViewer() {
+      if (!viewer.renderer || !viewer.camera) return;
+      const rect = mount.getBoundingClientRect();
+      const width = Math.max(1, Math.floor(rect.width));
+      const height = Math.max(1, Math.floor(rect.height));
+      viewer.renderer.setSize(width, height, false);
+      viewer.camera.aspect = width / height;
+      viewer.camera.updateProjectionMatrix();
+    }
+
+    function animate() {
+      if (!viewer.renderer) return;
+      viewer.frame = requestAnimationFrame(animate);
+      viewer.controls.update();
+      viewer.renderer.render(viewer.scene, viewer.camera);
+    }
+
+    function disposeObject(object) {
+      object.traverse((node) => {
+        if (node.geometry) node.geometry.dispose();
+        if (node.material) {
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          for (const material of materials) {
+            for (const key of Object.keys(material)) {
+              const value = material[key];
+              if (value && value.isTexture) value.dispose();
+            }
+            material.dispose();
+          }
+        }
+      });
+    }
+
+    function clearObjects() {
+      if (viewer.scene && viewer.object) {
+        viewer.scene.remove(viewer.object);
+        disposeObject(viewer.object);
+        viewer.object = null;
+      }
+      viewer.layers = {};
+      viewer.layerLabels = {};
+      viewer.loaded = false;
+      renderLayerControls();
+    }
+
+    function resetFixFrame() {
+      viewer.baseStableRotation = null;
+      viewer.currentStableRotation = null;
+      viewer.axesBasis = null;
+      setFixStatus("");
+    }
+
+    function fitCamera(object) {
+      const box = new THREE.Box3().setFromObject(object);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxSize = Math.max(size.x, size.y, size.z, 1e-6);
+      const distance = maxSize / (2 * Math.tan((viewer.camera.fov * Math.PI) / 360));
+      viewer.camera.near = Math.max(distance / 100, 0.0001);
+      viewer.camera.far = distance * 100;
+      viewer.camera.position.set(center.x + distance * 0.9, center.y - distance * 1.35, center.z + distance * 0.85);
+      viewer.camera.updateProjectionMatrix();
+      viewer.controls.target.copy(center);
+      viewer.controls.update();
+    }
+
+    function makeTextSprite(text, colorHex, size) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = colorHex;
+      ctx.font = "700 80px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 64, 68);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(size, size, size);
+      return sprite;
+    }
+
+    function makeCanonicalAxes(referenceObject) {
+      const box = new THREE.Box3().setFromObject(referenceObject);
+      const size = box.getSize(new THREE.Vector3());
+      const maxSize = Math.max(size.x, size.y, size.z, 0.04);
+      const length = maxSize * 0.75;
+      const headLength = length * 0.18;
+      const headWidth = length * 0.08;
+      const group = new THREE.Group();
+
+      const axes = [
+        { name: "X", dir: new THREE.Vector3(1, 0, 0), color: 0xd92d20, labelColor: "#d92d20" },
+        { name: "Y", dir: new THREE.Vector3(0, 1, 0), color: 0x12b76a, labelColor: "#12b76a" },
+        { name: "Z", dir: new THREE.Vector3(0, 0, 1), color: 0x1f6feb, labelColor: "#1f6feb" },
+      ];
+
+      for (const axis of axes) {
+        const arrow = new THREE.ArrowHelper(axis.dir, new THREE.Vector3(0, 0, 0), length, axis.color, headLength, headWidth);
+        group.add(arrow);
+        const label = makeTextSprite(axis.name, axis.labelColor, length * 0.16);
+        label.position.copy(axis.dir.clone().multiplyScalar(length * 1.12));
+        group.add(label);
+      }
+      group.userData.axisLengthM = length;
+      return group;
+    }
+
+    function addLayer(group, key, object) {
+      if (!object) return;
+      viewer.layers[key] = object;
+      group.add(object);
+    }
+
+    function axisLengthLabel(lengthM) {
+      if (lengthM >= 1.0) return `${lengthM.toFixed(2)} m`;
+      return `${(lengthM * 100).toFixed(1)} cm`;
+    }
+
+    function loadGltf(url) {
+      return new Promise((resolve, reject) => {
+        new GLTFLoader().load(url, (gltf) => resolve(gltf.scene), undefined, reject);
+      });
+    }
+
+    function loadObj(viewerInfo) {
+      return new Promise((resolve, reject) => {
+        const [objBase, objFile] = splitUrl(viewerInfo.model_url);
+        const objLoader = new OBJLoader();
+        objLoader.setPath(objBase);
+        const loadMesh = () => {
+          objLoader.load(
+            objFile,
+            (object) => resolve(object),
+            undefined,
+            reject,
+          );
+        };
+
+        if (viewerInfo.texture_url) {
+          objLoader.load(
+            objFile,
+            (object) => {
+              new THREE.TextureLoader().load(
+                viewerInfo.texture_url,
+                (texture) => {
+                  texture.colorSpace = THREE.SRGBColorSpace;
+                  object.traverse((node) => {
+                    if (node.isMesh) {
+                      node.material = new THREE.MeshStandardMaterial({
+                        map: texture,
+                        roughness: 0.78,
+                        metalness: 0.0,
+                      });
+                    }
+                  });
+                  resolve(object);
+                },
+                undefined,
+                reject,
+              );
+            },
+            undefined,
+            reject,
+          );
+          return;
+        }
+
+        if (!viewerInfo.material_url) {
+          loadMesh();
+          return;
+        }
+        const [mtlBase, mtlFile] = splitUrl(viewerInfo.material_url);
+        const mtlLoader = new MTLLoader();
+        mtlLoader.setPath(mtlBase);
+        mtlLoader.setResourcePath(mtlBase);
+        mtlLoader.load(
+          mtlFile,
+          (materials) => {
+            materials.preload();
+            objLoader.setMaterials(materials);
+            loadMesh();
+          },
+          undefined,
+          reject,
+        );
+      });
+    }
+
+    function applyUrdfVisualTransform(object, viewerInfo) {
+      const scale = viewerInfo.scale || [1, 1, 1];
+      const xyz = viewerInfo.xyz || [0, 0, 0];
+      const rpy = viewerInfo.rpy || [0, 0, 0];
+      object.scale.set(scale[0], scale[1], scale[2]);
+      object.position.set(xyz[0], xyz[1], xyz[2]);
+      object.rotation.set(rpy[0], rpy[1], rpy[2], "XYZ");
+    }
+
+    function stableRotationMatrix(info) {
+      const rot = (info && info.stable_rotation) || [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+      return new THREE.Matrix4().set(
+        rot[0][0], rot[0][1], rot[0][2], 0,
+        rot[1][0], rot[1][1], rot[1][2], 0,
+        rot[2][0], rot[2][1], rot[2][2], 0,
+        0, 0, 0, 1,
+      );
+    }
+
+    function applyStableRotation(object, info) {
+      object.applyMatrix4(stableRotationMatrix(info));
+      object.updateMatrixWorld(true);
+    }
+
+    function cloneRotation(rot) {
+      const source = rot || [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+      return source.map((row) => row.map((value) => Number(value)));
+    }
+
+    function matMul(a, b) {
+      const out = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+      for (let r = 0; r < 3; r += 1) {
+        for (let c = 0; c < 3; c += 1) {
+          out[r][c] = a[r][0] * b[0][c] + a[r][1] * b[1][c] + a[r][2] * b[2][c];
+        }
+      }
+      return out;
+    }
+
+    function matTranspose(a) {
+      return [
+        [a[0][0], a[1][0], a[2][0]],
+        [a[0][1], a[1][1], a[2][1]],
+        [a[0][2], a[1][2], a[2][2]],
+      ];
+    }
+
+    function threeMatrixFrom3x3(rot) {
+      return new THREE.Matrix4().set(
+        rot[0][0], rot[0][1], rot[0][2], 0,
+        rot[1][0], rot[1][1], rot[1][2], 0,
+        rot[2][0], rot[2][1], rot[2][2], 0,
+        0, 0, 0, 1,
+      );
+    }
+
+    function localStepRotation(axis, dir) {
+      const angle = dir === "ccw" ? Math.PI / 2 : -Math.PI / 2;
+      const c = Math.round(Math.cos(angle));
+      const s = Math.round(Math.sin(angle));
+      if (axis === "x") return [[1, 0, 0], [0, c, -s], [0, s, c]];
+      if (axis === "y") return [[c, 0, s], [0, 1, 0], [-s, 0, c]];
+      return [[c, -s, 0], [s, c, 0], [0, 0, 1]];
+    }
+
+    function setFixStatus(text, isError = false) {
+      fixStatus.textContent = text || "";
+      fixStatus.classList.toggle("error", Boolean(isError));
+    }
+
+    function tagKey(tag) {
+      return String(tag || "").trim().toLowerCase();
+    }
+
+    function uniqueTags(tags) {
+      const out = [];
+      const seen = new Set();
+      for (const tag of tags || []) {
+        const label = String(tag || "").trim();
+        const key = tagKey(label);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(label);
+      }
+      return out;
+    }
+
+    function sortedAvailableTags(item) {
+      const available = uniqueTags(item.available_tags && item.available_tags.length ? item.available_tags : FALLBACK_AVAILABLE_TAGS);
+      const byKey = new Map(available.map((tag) => [tagKey(tag), tag]));
+      const scene = SCENE_TAGS.filter((tag) => byKey.has(tagKey(tag))).map((tag) => byKey.get(tagKey(tag)));
+      const rest = available
+        .filter((tag) => !SCENE_TAG_KEYS.has(tagKey(tag)))
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+      return [...scene, ...rest];
+    }
+
+    function tagRowHtml(tag) {
+      const key = tagKey(tag);
+      const checked = viewer.tagSelected.has(key);
+      const isScene = SCENE_TAG_KEYS.has(key);
+      return `
+        <label class="tag-row${checked ? " selected" : ""}${isScene ? " scene-tag" : ""}">
+          <input type="checkbox" data-tag="${key}" ${checked ? "checked" : ""}>
+          <span>${tag}</span>
+        </label>
+      `;
+    }
+
+    function tagStateChanged() {
+      const selected = Array.from(viewer.tagSelected).sort();
+      const original = [...viewer.tagOriginal].sort();
+      return selected.length !== original.length || selected.some((tag, index) => tag !== original[index]);
+    }
+
+    function setTagStatus(text, isError = false) {
+      tagStatus.textContent = text || "";
+      tagStatus.classList.toggle("error", Boolean(isError));
+    }
+
+    function updateTagSaveState() {
+      tagSaveBtn.disabled = viewer.tagSaving || !viewer.currentItem || !tagStateChanged();
+    }
+
+    function setEnabledStatus(text, isError = false) {
+      enabledStatus.textContent = text || "";
+      enabledStatus.classList.toggle("error", Boolean(isError));
+    }
+
+    function renderEnabledToggle(item) {
+      const enabled = !item || item.enabled !== false;
+      enabledToggleBtn.textContent = enabled ? "Enabled" : "Disabled";
+      enabledToggleBtn.classList.toggle("off", !enabled);
+      enabledToggleBtn.classList.toggle("saving", viewer.enabledSaving);
+      enabledToggleBtn.setAttribute("aria-pressed", enabled ? "true" : "false");
+      enabledToggleBtn.disabled = !item;
+    }
+
+    function setItemEnabled(item, enabled) {
+      item.enabled = Boolean(enabled);
+      renderEnabledToggle(item);
+      if (window.assetBrowserSetAssetEnabled) {
+        window.assetBrowserSetAssetEnabled(item.uid, item.enabled);
+      }
+    }
+
+    async function drainEnabledQueue() {
+      if (viewer.enabledSaving || !viewer.currentItem || viewer.enabledQueued === null) return;
+      while (viewer.currentItem && viewer.enabledQueued !== null) {
+        const item = viewer.currentItem;
+        const enabled = Boolean(viewer.enabledQueued);
+        viewer.enabledQueued = null;
+        viewer.enabledSaving = true;
+        renderEnabledToggle(item);
+        setEnabledStatus("saving");
+        try {
+          const response = await fetch("/api/assets/enabled", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              asset_id: item.asset_id,
+              enabled,
+            }),
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || response.statusText);
+          }
+          const payload = await response.json();
+          if (viewer.currentItem && viewer.currentItem.asset_id === payload.asset_id && viewer.enabledQueued === null) {
+            setItemEnabled(viewer.currentItem, payload.enabled);
+          }
+          setEnabledStatus(viewer.enabledQueued === null ? "saved" : "");
+        } catch (error) {
+          setEnabledStatus(error.message, true);
+          viewer.enabledQueued = null;
+        } finally {
+          viewer.enabledSaving = false;
+          if (viewer.currentItem) renderEnabledToggle(viewer.currentItem);
+        }
+      }
+    }
+
+    function renderTagPanel(item) {
+      const currentTags = uniqueTags(item.tags || [item.category, ...(item.extra_categories || [])]);
+      viewer.tagOriginal = currentTags.map(tagKey);
+      viewer.tagSelected = new Set(viewer.tagOriginal);
+      const available = sortedAvailableTags(item);
+      const sceneRows = available.filter((tag) => SCENE_TAG_KEYS.has(tagKey(tag))).map(tagRowHtml).join("");
+      const objectRows = available.filter((tag) => !SCENE_TAG_KEYS.has(tagKey(tag))).map(tagRowHtml).join("");
+      tagList.innerHTML = `
+        ${sceneRows}
+        <button class="new-tag-btn" id="newTagBtn" type="button">+ New Tag</button>
+        ${objectRows}
+      `;
+      tagList.querySelectorAll("input[data-tag]").forEach((input) => {
+        input.addEventListener("change", () => {
+          if (input.checked) viewer.tagSelected.add(input.dataset.tag);
+          else viewer.tagSelected.delete(input.dataset.tag);
+          input.closest(".tag-row").classList.toggle("selected", input.checked);
+          setTagStatus(tagStateChanged() ? "unsaved" : "");
+          updateTagSaveState();
+        });
+      });
+      document.getElementById("newTagBtn").addEventListener("click", createNewTag);
+      tagPanel.classList.remove("disabled");
+      setTagStatus("");
+      updateTagSaveState();
+    }
+
+    async function createNewTag() {
+      if (!viewer.currentItem || viewer.tagSaving) return;
+      const raw = window.prompt("New tag name");
+      if (raw === null) return;
+      const tag = raw.trim();
+      if (!tag) return;
+      viewer.tagSaving = true;
+      updateTagSaveState();
+      setTagStatus("creating");
+      try {
+        const response = await fetch("/api/tags", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tag }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || response.statusText);
+        }
+        const payload = await response.json();
+        viewer.currentItem.available_tags = payload.available_tags || viewer.currentItem.available_tags || FALLBACK_AVAILABLE_TAGS;
+        renderTagPanel(viewer.currentItem);
+        const newKey = tagKey(payload.tag);
+        viewer.tagSelected.add(newKey);
+        const input = tagList.querySelector(`input[data-tag="${CSS.escape(newKey)}"]`);
+        if (input) {
+          input.checked = true;
+          input.closest(".tag-row").classList.add("selected");
+        }
+        setTagStatus("new tag added · unsaved");
+      } catch (error) {
+        setTagStatus(error.message, true);
+      } finally {
+        viewer.tagSaving = false;
+        updateTagSaveState();
+      }
+    }
+
+    function selectedTagLabels(item) {
+      const byKey = new Map(sortedAvailableTags(item).map((tag) => [tagKey(tag), tag]));
+      return Array.from(viewer.tagSelected).map((key) => byKey.get(key) || key);
+    }
+
+    function hasSelectedSceneTag() {
+      return Array.from(viewer.tagSelected).some((tag) => SCENE_TAG_KEYS.has(tag));
+    }
+
+    function updatePayloadTags(item, payload) {
+      item.category = payload.category;
+      item.tags = payload.tags || [];
+      item.extra_categories = payload.all_tags || payload.tags || [];
+      meta.textContent = `${item.category} · ${item.source} · ${item.file_format.toUpperCase()} · ${item.asset_id}`;
+    }
+
+    function updatePayloadStableRotation(item, rot) {
+      if (!item || !item.viewer) return;
+      item.viewer.stable_rotation = cloneRotation(rot);
+      for (const key of ["visual", "collision"]) {
+        if (item.viewer[key]) item.viewer[key].stable_rotation = cloneRotation(rot);
+      }
+    }
+
+    function applyAxesBasis() {
+      const axes = viewer.layers.axes;
+      if (!axes || !viewer.axesBasis) return;
+      axes.matrixAutoUpdate = false;
+      axes.matrix.copy(threeMatrixFrom3x3(viewer.axesBasis));
+      axes.updateMatrixWorld(true);
+    }
+
+    function applyFixRotation(axis, dir) {
+      if (!viewer.loaded || !viewer.baseStableRotation || !viewer.axesBasis) return;
+      viewer.axesBasis = matMul(viewer.axesBasis, localStepRotation(axis, dir));
+      applyAxesBasis();
+      viewer.currentStableRotation = matMul(matTranspose(viewer.axesBasis), viewer.baseStableRotation);
+      setFixStatus("unsaved");
+    }
+
+    function applyMaterial(object, material) {
+      object.traverse((node) => {
+        if (node.isMesh) {
+          node.material = material.clone();
+          node.material.needsUpdate = true;
+        }
+      });
+    }
+
+    async function loadMeshObject(info) {
+      if (!info) throw new Error("No browser-loadable mesh is available for this asset.");
+      if (info.format === "glb" || info.format === "gltf") {
+        const object = await loadGltf(info.model_url);
+        applyUrdfVisualTransform(object, info);
+        applyStableRotation(object, info);
+        return object;
+      }
+      if (info.format === "obj") {
+        const object = await loadObj(info);
+        applyUrdfVisualTransform(object, info);
+        applyStableRotation(object, info);
+        return object;
+      }
+      throw new Error(`Unsupported browser mesh format: ${info.format}`);
+    }
+
+    async function loadContactPoints(url, colorHex) {
+      if (!url) return null;
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      const payload = await response.json();
+      const points = payload.points || [];
+      if (!points.length) return null;
+      const positions = new Float32Array(points.length * 3);
+      for (let i = 0; i < points.length; i += 1) {
+        positions[i * 3 + 0] = points[i][0];
+        positions[i * 3 + 1] = points[i][1];
+        positions[i * 3 + 2] = points[i][2];
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const material = new THREE.PointsMaterial({
+        color: colorHex,
+        size: 0.006,
+        sizeAttenuation: true,
+        depthTest: true,
+      });
+      const object = new THREE.Points(geometry, material);
+      applyStableRotation(object, viewer.layersInfo || {});
+      return object;
+    }
+
+    async function loadViewerLayers(item, token) {
+      const info = item.viewer;
+      if (!info) throw new Error("No browser-loadable mesh is available for this asset.");
+      viewer.layersInfo = info;
+      const group = new THREE.Group();
+
+      if (info.visual) {
+        const visual = await loadMeshObject(info.visual);
+        if (token !== viewer.token) {
+          disposeObject(visual);
+          return null;
+        }
+        addLayer(group, "visual", visual);
+      }
+
+      if (info.collision) {
+        const collision = await loadMeshObject(info.collision);
+        if (token !== viewer.token) {
+          disposeObject(group);
+          disposeObject(collision);
+          return null;
+        }
+        applyMaterial(collision, new THREE.MeshStandardMaterial({
+          color: 0x5d6778,
+          transparent: true,
+          opacity: 0.28,
+          roughness: 0.88,
+          metalness: 0.0,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        }));
+        addLayer(group, "collision", collision);
+      }
+
+      const lower = await loadContactPoints(info.lower_contact_url, 0x1f6feb);
+      if (token !== viewer.token) {
+        disposeObject(group);
+        if (lower) disposeObject(lower);
+        return null;
+      }
+      if (lower) {
+        addLayer(group, "lower", lower);
+      }
+
+      const upper = await loadContactPoints(info.upper_contact_url, 0xd92d20);
+      if (token !== viewer.token) {
+        disposeObject(group);
+        if (upper) disposeObject(upper);
+        return null;
+      }
+      if (upper) {
+        addLayer(group, "upper", upper);
+      }
+
+      const axes = makeCanonicalAxes(group);
+      viewer.axesBasis = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+      viewer.layerLabels.axes = `stable XYZ axes (${axisLengthLabel(axes.userData.axisLengthM)})`;
+      addLayer(group, "axes", axes);
+      applyAxesBasis();
+      viewer.object = group;
+      viewer.scene.add(group);
+      fitCamera(group);
+      viewer.loaded = true;
+      renderLayerControls();
+      setViewerHint("", false);
+      return group;
+    }
+
+    window.openAssetViewer = async (item) => {
+      modal.classList.remove("hidden");
+      fixWidget.style.display = "";
+      title.textContent = item.label || item.model_name || item.model_id || item.asset_id;
+      meta.textContent = `${item.category} · ${item.source} · ${item.file_format.toUpperCase()} · ${item.asset_id}`;
+      viewer.currentItem = item;
+      viewer.enabledQueued = null;
+      setEnabledStatus("");
+      renderEnabledToggle(item);
+      renderTagPanel(item);
+      viewer.baseStableRotation = cloneRotation((item.viewer && item.viewer.stable_rotation) || [[1, 0, 0], [0, 1, 0], [0, 0, 1]]);
+      viewer.currentStableRotation = cloneRotation(viewer.baseStableRotation);
+      viewer.axesBasis = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+      setFixStatus("");
+      ensureViewer();
+      resizeViewer();
+      if (!viewer.frame) animate();
+      clearObjects();
+      const token = viewer.token + 1;
+      viewer.token = token;
+      renderLayerControls();
+      setViewerHint("Loading layers...");
+      try {
+        await loadViewerLayers(item, token);
+      } catch (error) {
+        setViewerHint(`3D load failed: ${error.message}`);
+      }
+    };
+
+    function closeViewer() {
+      modal.classList.add("hidden");
+      viewer.token += 1;
+      clearObjects();
+      viewer.currentItem = null;
+      viewer.enabledQueued = null;
+      setEnabledStatus("");
+      renderEnabledToggle(null);
+      tagWidget.classList.remove("open");
+      tagToggleBtn.setAttribute("aria-expanded", "false");
+      viewer.tagOriginal = [];
+      viewer.tagSelected = new Set();
+      tagList.innerHTML = "";
+      setTagStatus("");
+      updateTagSaveState();
+      resetFixFrame();
+      if (viewer.frame) {
+        cancelAnimationFrame(viewer.frame);
+        viewer.frame = null;
+      }
+    }
+
+    enabledToggleBtn.addEventListener("click", () => {
+      if (!viewer.currentItem) return;
+      const enabled = viewer.currentItem.enabled === false;
+      setItemEnabled(viewer.currentItem, enabled);
+      viewer.enabledQueued = enabled;
+      drainEnabledQueue();
+    });
+    fixToggleBtn.addEventListener("click", () => {
+      const open = !fixWidget.classList.contains("open");
+      fixWidget.classList.toggle("open", open);
+      fixToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    tagToggleBtn.addEventListener("click", () => {
+      const open = !tagWidget.classList.contains("open");
+      tagWidget.classList.toggle("open", open);
+      tagToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    document.querySelectorAll("[data-fix-axis]").forEach((button) => {
+      button.addEventListener("click", () => {
+        applyFixRotation(button.dataset.fixAxis, button.dataset.fixDir);
+      });
+    });
+    fixSaveBtn.addEventListener("click", async () => {
+      if (!viewer.currentItem || !viewer.currentStableRotation || viewer.saving) return;
+      viewer.saving = true;
+      fixSaveBtn.disabled = true;
+      setFixStatus("saving");
+      try {
+        const response = await fetch("/api/assets/stable-rotation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            asset_id: viewer.currentItem.asset_id,
+            stable_rotation: viewer.currentStableRotation,
+          }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || response.statusText);
+        }
+        const payload = await response.json();
+        viewer.currentStableRotation = cloneRotation(payload.stable_rotation);
+        updatePayloadStableRotation(viewer.currentItem, viewer.currentStableRotation);
+        setFixStatus("saved");
+      } catch (error) {
+        setFixStatus(error.message, true);
+      } finally {
+        viewer.saving = false;
+        fixSaveBtn.disabled = false;
+      }
+    });
+    tagSaveBtn.addEventListener("click", async () => {
+      if (!viewer.currentItem || viewer.tagSaving || !tagStateChanged()) return;
+      if (!hasSelectedSceneTag()) {
+        setTagStatus("Select Kitchen, Tools, or Desk before saving.", true);
+        return;
+      }
+      viewer.tagSaving = true;
+      updateTagSaveState();
+      setTagStatus("saving");
+      try {
+        const tags = selectedTagLabels(viewer.currentItem);
+        const response = await fetch("/api/assets/tags", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            asset_id: viewer.currentItem.asset_id,
+            tags,
+          }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || response.statusText);
+        }
+        const payload = await response.json();
+        updatePayloadTags(viewer.currentItem, payload);
+        viewer.tagOriginal = (payload.tags || []).map(tagKey);
+        viewer.tagSelected = new Set(viewer.tagOriginal);
+        setTagStatus("saved");
+      } catch (error) {
+        setTagStatus(error.message, true);
+      } finally {
+        viewer.tagSaving = false;
+        updateTagSaveState();
+      }
+    });
+    closeBtn.addEventListener("click", closeViewer);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeViewer();
+    });
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !modal.classList.contains("hidden")) closeViewer();
+    });
+    window.assetViewerLoadError = "";
+  </script>
+</body>
+</html>
