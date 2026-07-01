@@ -45,3 +45,5 @@ assets/textures/**/*.jpg
 
 # Local append-only log of the sizing studio's scale edits; not a shared artifact.
 handcraft/scale_edits.jsonl
+
+handcraft_bundle/
