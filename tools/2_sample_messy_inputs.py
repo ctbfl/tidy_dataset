@@ -12,8 +12,6 @@ from sapien import render
 REPO = Path(__file__).resolve().parents[1]
 SIM_DIR = REPO / "simulations"
 TOOLS_DIR = REPO / "tools"
-DATA_ROOT = REPO / "data" / "organize_it_dataset_v2"
-DEFAULT_PARENT = DATA_ROOT / "dining_table" / "after_meal_cleanup_v2"
 
 if str(SIM_DIR) not in sys.path:
     sys.path.insert(0, str(SIM_DIR))
@@ -26,7 +24,6 @@ from objects import asset_json_backup_dir, write_asset_json_backup  # noqa: E402
 from scene import LIBRARY, create_scene  # noqa: E402
 from scene_runtime import (  # noqa: E402
     DEFAULT_CALIBRATION,
-    DEFAULT_CATALOG,
     add_calibrated_camera,
     capture_current,
     load_reference_module,
@@ -35,20 +32,16 @@ from scene_runtime import (  # noqa: E402
 )
 
 
-def scene_dirs(parent: Path, scene_range: list[int] | None) -> list[Path]:
-    if scene_range is None:
-        return [
-            path for path in sorted(parent.iterdir())
-            if path.is_dir() and path.name.isdigit() and (path / "tidy.json").is_file()
-        ]
-    start, end = scene_range
-    if start > end:
-        raise ValueError("--range START END requires START <= END")
-    return [parent / f"{i:03d}" for i in range(start, end + 1)]
+def scene_dirs(parent: Path, start: int, count: int) -> list[Path]:
+    if start <= 0:
+        raise ValueError("--start must be positive")
+    if count <= 0:
+        raise ValueError("--count must be positive")
+    return [parent / f"{i:03d}" for i in range(start, start + count)]
 
 
 def convert_messy_to_pipeline_inputs(messy_path: Path, scene_type: str | None) -> tuple[dict, object]:
-    catalog_path = DEFAULT_CATALOG.expanduser().resolve()
+    catalog_path = Path(LIBRARY.catalog_path).expanduser().resolve()
     calibration_path = DEFAULT_CALIBRATION.expanduser().resolve()
     registry = EXP.AssetRegistry.load(catalog_path)
     calibration = json.loads(calibration_path.read_text())
@@ -88,20 +81,25 @@ def ensure_user_prompt_file(scene_dir: Path, tidy: dict) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("parent_dir", type=Path, nargs="?", default=DEFAULT_PARENT)
-    parser.add_argument("--range", nargs=2, type=int, metavar=("START", "END"))
+    parser.add_argument("variation_dir", type=Path)
+    parser.add_argument("--start", type=int, required=True)
+    parser.add_argument("--count", type=int, required=True)
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    parent = args.parent_dir.expanduser().resolve()
+    parent = args.variation_dir.expanduser().resolve()
     if not parent.is_dir():
         raise SystemExit(f"not a directory: {parent}")
-    dirs = scene_dirs(parent, args.range)
-    if not dirs:
-        raise SystemExit(f"no scene folders with tidy.json under {parent}")
+    dirs = scene_dirs(parent, args.start, args.count)
+    missing_tidy = [scene_dir / "tidy.json" for scene_dir in dirs if not (scene_dir / "tidy.json").is_file()]
+    if missing_tidy:
+        raise FileNotFoundError(missing_tidy[0])
+    existing_messy = [scene_dir / "messy.json" for scene_dir in dirs if (scene_dir / "messy.json").exists()]
+    if existing_messy and not args.overwrite:
+        raise FileExistsError(f"messy.json already exists: {existing_messy[0]}")
 
     gen_args = argparse.Namespace(
         height_thresh=0.30,
@@ -122,18 +120,10 @@ def main() -> None:
     render.set_ray_tracing_path_depth(1)
     cmask = M.corner_mask(gen_args.corner_frac)
 
-    written = failed = skipped = 0
+    written = failed = 0
     for idx, scene_dir in enumerate(dirs):
         tidy_path = scene_dir / "tidy.json"
         messy_path = scene_dir / "messy.json"
-        if not tidy_path.is_file():
-            print(f"[skip]  {scene_dir.name}: no tidy.json")
-            skipped += 1
-            continue
-        if messy_path.exists() and not args.overwrite:
-            print(f"[skip]  {scene_dir.name}: messy.json exists")
-            skipped += 1
-            continue
 
         LIBRARY.load_asset_json_backup(asset_json_backup_dir(tidy_path))
         tidy = json.loads(tidy_path.read_text())
@@ -156,7 +146,7 @@ def main() -> None:
         print(f"[write] {scene_dir.name}/messy.json + current.*  {len(messy['items'])} items  attempt {attempts}")
         written += 1
 
-    print(f"done: {written} written, {failed} failed, {skipped} skipped")
+    print(f"done: {written} written, {failed} failed")
 
 
 if __name__ == "__main__":
