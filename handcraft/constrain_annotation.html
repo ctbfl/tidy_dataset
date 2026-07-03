@@ -11,7 +11,7 @@
   button, input, select, textarea { font: inherit; }
   #left { width: 330px; background: #1d2027; border-right: 1px solid #303640; display: flex; flex-direction: column; }
   #center { flex: 1; min-width: 0; background: #0c0d10; display: flex; flex-direction: column; }
-  #right { width: 420px; background: #1d2027; border-left: 1px solid #303640; display: flex; flex-direction: column; }
+  #right { width: 420px; min-height: 0; background: #1d2027; border-left: 1px solid #303640; display: flex; flex-direction: column; }
   .bar { padding: 10px; display: grid; gap: 7px; border-bottom: 1px solid #303640; background: #20242b; }
   .row { display: flex; gap: 7px; align-items: center; }
   label { color: #9aa3b2; font-size: 12px; }
@@ -76,7 +76,8 @@
   #menu button.selection:hover { background: #f0b73d; }
   #menu button:hover { background: #3d4a61; }
 
-  #relations { overflow: auto; padding: 10px; }
+  #constraintRight { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #relations { flex: 1; min-height: 0; overflow: auto; padding: 10px; }
   .rel { border: 1px solid #303640; border-radius: 6px; background: #171a20; margin-bottom: 8px; overflow: hidden; }
   .rel.selection { border-color: #d19024; background: #251f13; }
   .rel.incomplete { border-color: #4388d6; background: #151d2a; }
