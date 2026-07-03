@@ -35,6 +35,7 @@ __pycache__/
 # Experiment run outputs.
 aris_exp/
 experiments/vlm_coordinate_frame*/
+sgbot_comparison/logs/
 
 # Texture curation scratch (thumbnails, montages, CLIP embeddings, preview renders)
 assets/_texture_curate/
