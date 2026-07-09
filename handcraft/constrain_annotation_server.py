@@ -22,7 +22,7 @@ if str(SIMULATIONS_DIR) not in sys.path:
     sys.path.insert(0, str(SIMULATIONS_DIR))
 
 from editor import OUTLINE_COLOR, RELATION_OUTLINE_COLOR, SceneEditor, _world_aabb, _xy_overlaps  # noqa: E402
-from objects import Asset, spawn  # noqa: E402
+from objects import Asset, AssetRegistry, spawn  # noqa: E402
 from preview import PreviewRenderer  # noqa: E402
 from scene import LIBRARY  # noqa: E402
 
@@ -39,9 +39,32 @@ DELETE_RELATION = "delete_relation"
 KEEP_RELATION = "keep_relation"
 
 previews = PreviewRenderer()
-ENABLED_ASSET_IDS = {asset.id for asset in LIBRARY if LIBRARY.is_enabled(asset.id)}
-SOURCES = sorted({asset.source for asset in LIBRARY if asset.id in ENABLED_ASSET_IDS})
-TAGS = sorted({tag for asset in LIBRARY if asset.id in ENABLED_ASSET_IDS for tag in asset.tags})
+
+
+def _refresh_asset_globals() -> None:
+    global ENABLED_ASSET_IDS, SOURCES, TAGS
+    ENABLED_ASSET_IDS = {asset.id for asset in LIBRARY if LIBRARY.is_enabled(asset.id)}
+    SOURCES = sorted({asset.source for asset in LIBRARY if asset.id in ENABLED_ASSET_IDS})
+    TAGS = sorted({tag for asset in LIBRARY if asset.id in ENABLED_ASSET_IDS for tag in asset.tags})
+
+
+def reload_asset_library() -> None:
+    """Re-read every asset json from the real asset source (the catalog and the
+    per-asset json files), so edited stable transforms / scale / collision shapes
+    take effect without restarting the server.
+
+    Deliberately does NOT pass a backup dir: the per-scene asset_json backup is
+    write-only and may hold stale content, so we always reload from the source.
+    """
+    LIBRARY.registry = AssetRegistry.load(LIBRARY.catalog_path)
+    LIBRARY.assets = {handle.asset_id: Asset(handle) for handle in LIBRARY.registry.list(enabled_only=False)}
+    _refresh_asset_globals()
+
+
+ENABLED_ASSET_IDS: set[str] = set()
+SOURCES: list[str] = []
+TAGS: list[str] = []
+_refresh_asset_globals()
 
 
 class IncompleteRelation(ValueError):
@@ -119,6 +142,7 @@ def _normalize_available_assets(payload: dict) -> dict:
         category_id = str(category_id).strip()
         if not category_id:
             raise ValueError("category_id cannot be empty")
+        description = str(category.get("description", "")).strip()
         slot_count = int(category.get("slot_count", 1))
         if slot_count < 1:
             raise ValueError(f"{category_id}: slot_count must be >= 1")
@@ -145,7 +169,7 @@ def _normalize_available_assets(payload: dict) -> dict:
             seen_entries.add(key)
             entries.append(clean)
 
-        categories[category_id] = {"slot_count": slot_count, "entries": entries}
+        categories[category_id] = {"description": description, "slot_count": slot_count, "entries": entries}
     return {"version": 1, "available_assets": categories}
 
 
@@ -260,6 +284,7 @@ class ConstraintStudio:
         }
 
     def load_template(self, name: str) -> None:
+        reload_asset_library()
         data = json.loads(_constraint_path(self.scenario, self.variation, name).read_text())
         object_sets = [{"category": str(s["category"])} for s in data.get("object_sets", [])]
         for object_set in object_sets:
@@ -848,6 +873,16 @@ class ConstraintStudio:
         self.selected_keys = {key} if key else set()
         self._sync_selection()
 
+    def toggle_select_key(self, key: str) -> None:
+        self.clear_highlight()
+        if key not in self.scene_ids:
+            return
+        if key in self.selected_keys:
+            self.selected_keys.remove(key)
+        else:
+            self.selected_keys.add(key)
+        self._sync_selection()
+
     def select_at(self, x: int, y: int) -> None:
         self.editor.select_at(x, y)
         self.select_scene_id(self.editor.selected)
@@ -1412,7 +1447,8 @@ class ConstraintStudio:
         }
 
     def _strict_support_edges(self) -> dict[frozenset[str], tuple[str, str]]:
-        edges = {}
+        direct_edges = {}
+        graph: dict[str, set[str]] = {}
         for relation in self.constraints:
             kind = relation.get("type")
             try:
@@ -1427,10 +1463,30 @@ class ConstraintStudio:
             except (KeyError, ValueError):
                 continue
             pair = frozenset((lower, upper))
-            previous = edges.get(pair)
+            previous = direct_edges.get(pair)
             if previous is not None and previous != (lower, upper):
                 raise ValueError(f"conflicting support relation between {self._label(lower)} and {self._label(upper)}")
-            edges[pair] = (lower, upper)
+            direct_edges[pair] = (lower, upper)
+            graph.setdefault(lower, set()).add(upper)
+            graph.setdefault(upper, set())
+
+        edges = dict(direct_edges)
+        for start in graph:
+            stack = list(graph[start])
+            seen = set()
+            while stack:
+                upper = stack.pop()
+                if upper in seen:
+                    continue
+                if upper == start:
+                    raise ValueError(f"support relation cycle involving {self._label(start)}")
+                seen.add(upper)
+                pair = frozenset((start, upper))
+                previous = edges.get(pair)
+                if previous is not None and previous != (start, upper):
+                    raise ValueError(f"conflicting support relation between {self._label(start)} and {self._label(upper)}")
+                edges[pair] = (start, upper)
+                stack.extend(graph.get(upper, ()))
         return edges
 
     def _support_order_graph(self, moving_keys: set[str]) -> dict[str, set[str]]:
@@ -1984,6 +2040,8 @@ async def ws(socket: WebSocket):
                         studio.place_object(msg["key"], int(msg["x"]), int(msg["y"]))
                     elif kind == "select":
                         studio.select_scene_id(msg["scene_id"])
+                    elif kind == "toggle_select_key":
+                        studio.toggle_select_key(msg["key"])
                     elif kind == "select_at":
                         studio.select_at(msg["x"], msg["y"])
                     elif kind == "select_rect":
