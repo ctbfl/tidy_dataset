@@ -5,6 +5,7 @@ import argparse
 import json
 import random
 import sys
+import time
 from pathlib import Path
 
 from sapien import render
@@ -85,6 +86,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--start", type=int, required=True)
     parser.add_argument("--count", type=int, required=True)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--no-anchor", action="store_true")
+    parser.add_argument(
+        "--keep-on-top",
+        nargs="*",
+        default=None,
+        metavar="CATEGORY",
+        help="Move on_top_of-connected objects as one rigid group. Optionally pass one "
+        "or more categories (e.g. --keep-on-top raw_meat) to only apply this to on_top "
+        "relations involving those categories.",
+    )
     return parser.parse_args()
 
 
@@ -108,17 +119,20 @@ def main() -> None:
         corner_frac=0.25,
         gap=0.5,
         max_attempts=300,
+        no_anchor=args.no_anchor,
+        keep_on_top=args.keep_on_top,
     )
     ts = create_scene(headless=True, table_length=1.2, table_width=0.7, table_height=0.74)
     mod = load_reference_module()
     calibration = mod.preview._load_robotwin_camera_calibration(DEFAULT_CALIBRATION)
     camera_info = calibration["camera"]
-    cam, _ = add_calibrated_camera(mod, ts, camera_info)
+    cam, T_world_from_sapien_cam = add_calibrated_camera(mod, ts, camera_info)
     M.CAM_W = int(camera_info["width"])
     M.CAM_H = int(camera_info["height"])
     render.set_ray_tracing_samples_per_pixel(1)
     render.set_ray_tracing_path_depth(1)
     cmask = M.corner_mask(gen_args.corner_frac)
+    run_seed = time.time_ns()
 
     written = failed = 0
     for idx, scene_dir in enumerate(dirs):
@@ -128,8 +142,13 @@ def main() -> None:
         LIBRARY.load_asset_json_backup(asset_json_backup_dir(tidy_path))
         tidy = json.loads(tidy_path.read_text())
         ensure_user_prompt_file(scene_dir, tidy)
-        rng = random.Random(idx)
-        items, attempts, status = M.generate(ts, cam, tidy, gen_args, rng, cmask, [])
+        rng = random.Random(run_seed + idx)
+        on_top_groups = (
+            M.on_top_slot_groups(tidy_path, tidy, args.keep_on_top)
+            if args.keep_on_top is not None
+            else []
+        )
+        items, attempts, status = M.generate(ts, cam, tidy, gen_args, rng, cmask, [], on_top_groups)
         if items is None:
             print(f"[FAIL]  {scene_dir.name}: {status} ({attempts} attempts)")
             failed += 1
@@ -142,7 +161,9 @@ def main() -> None:
         write_asset_json_backup(messy_path, messy, LIBRARY)
 
         scene_data, asset_registry = convert_messy_to_pipeline_inputs(messy_path, None)
-        capture_current(ts, scene_dir, scene_data, asset_registry)
+        capture_current(
+            ts, scene_dir, scene_data, asset_registry, mod, cam, camera_info, T_world_from_sapien_cam
+        )
         print(f"[write] {scene_dir.name}/messy.json + current.*  {len(messy['items'])} items  attempt {attempts}")
         written += 1
 

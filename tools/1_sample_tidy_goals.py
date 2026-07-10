@@ -26,6 +26,9 @@ write_asset_json_backup = None
 curated_textures = None
 render_reference_goal = None
 settle_scene = None
+load_reference_module = None
+add_calibrated_camera = None
+DEFAULT_CALIBRATION = None
 
 
 def next_scene_ids(root: Path, sample_count: int, start: int | None) -> list[str]:
@@ -112,13 +115,20 @@ def validate_dataset_format(constraint_path: Path, dataset_root: Path, scenario:
 
 def import_runtime_modules(dataset_root: Path) -> None:
     global studio, LIBRARY, write_asset_json_backup, curated_textures, render_reference_goal, settle_scene
+    global load_reference_module, add_calibrated_camera, DEFAULT_CALIBRATION
     os.environ["TIDY_DATASET_DIR"] = str(dataset_root)
 
     from constrain_annotation_server import studio as constraint_studio  # noqa: E402
     from objects import write_asset_json_backup as write_backup  # noqa: E402
     from robotwin_utils import curated_textures as texture_catalog  # noqa: E402
     from scene import LIBRARY as asset_library  # noqa: E402
-    from scene_runtime import render_reference_goal as render_goal, settle_scene as settle  # noqa: E402
+    from scene_runtime import (  # noqa: E402
+        DEFAULT_CALIBRATION as default_calibration,
+        add_calibrated_camera as add_camera,
+        load_reference_module as load_ref_module,
+        render_reference_goal as render_goal,
+        settle_scene as settle,
+    )
 
     studio = constraint_studio
     LIBRARY = asset_library
@@ -126,6 +136,9 @@ def import_runtime_modules(dataset_root: Path) -> None:
     curated_textures = texture_catalog
     render_reference_goal = render_goal
     settle_scene = settle
+    load_reference_module = load_ref_module
+    add_calibrated_camera = add_camera
+    DEFAULT_CALIBRATION = default_calibration
 
 
 def table_texture_ids() -> list[str]:
@@ -180,6 +193,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("constraint_path")
     parser.add_argument("--count", type=int, required=True)
     parser.add_argument("--start", type=int, default=None)
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="force re-run scene ids in this batch even if folders already exist",
+    )
     return parser.parse_args()
 
 
@@ -190,13 +208,16 @@ def main() -> None:
     out_root = dataset_root / scenario / variation
     scene_ids = next_scene_ids(out_root, args.count, args.start)
     existing_folders = [out_root / scene_id for scene_id in scene_ids if (out_root / scene_id).exists()]
-    if existing_folders:
+    if existing_folders and not args.overwrite:
         raise FileExistsError(f"scene folder already exists: {existing_folders[0]}")
 
     import_runtime_modules(dataset_root)
     studio.load_variation(scenario, variation, clear=True)
     studio.load_template(template_name)
     textures = table_texture_ids()
+    mod = load_reference_module()
+    calibration = mod.preview._load_robotwin_camera_calibration(DEFAULT_CALIBRATION)
+    goal_camera, _ = add_calibrated_camera(mod, studio.editor.scene_wrap, calibration["camera"])
 
     for scene_id in scene_ids:
         folder = out_root / scene_id
@@ -204,7 +225,7 @@ def main() -> None:
         studio.randomize_sets()
         settle_scene(studio.editor.scene_wrap)
         tidy = tidy_scene_dict(scene_id, scenario, variation, template_name)
-        folder.mkdir()
+        folder.mkdir(exist_ok=args.overwrite)
         tidy_path = folder / f"{ARRANGEMENT}.json"
         tidy_path.write_text(json.dumps(tidy, indent=2, ensure_ascii=False))
         if tidy.get("user_prompt"):
@@ -212,8 +233,9 @@ def main() -> None:
         else:
             print(f"[warn] {display_path(folder)}: template has no user_prompt")
         write_asset_json_backup(tidy_path, tidy, LIBRARY)
-        render_reference_goal(studio.editor.scene_wrap, folder / GOAL_IMAGE)
-        print(f"[write] {display_path(folder)}  {len(tidy['items'])} objects  +{GOAL_IMAGE}")
+        render_reference_goal(studio.editor.scene_wrap, folder / GOAL_IMAGE, mod, goal_camera)
+        tag = "overwrite" if args.overwrite and folder in existing_folders else "write"
+        print(f"[{tag}] {display_path(folder)}  {len(tidy['items'])} objects  +{GOAL_IMAGE}")
 
 
 if __name__ == "__main__":

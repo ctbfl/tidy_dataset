@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import os
 import pickle
 import sys
 from pathlib import Path
@@ -14,10 +15,20 @@ from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SIM_DIR = REPO_ROOT / "simulations"
-ORGANIZE_IT_ROOT = Path("/home/hjs/Projects/table_arrangement/organize_it_v2")
+# organize_it repo root -- provides the reference capture script + camera calibration.
+# Independent from the asset library and dataset dirs. Override with TIDY_ORGANIZE_IT_ROOT.
+ORGANIZE_IT_ROOT = Path(os.environ.get(
+    "TIDY_ORGANIZE_IT_ROOT",
+    "/home/hjs/Projects/table_arrangement/organize_it_v2",
+))
 REF_DIR = ORGANIZE_IT_ROOT / "experiments" / "pybullet_ur5_test_simple"
 REF_SCRIPT = REF_DIR / "collect_asset_library_camera_scene_sample.py"
-DEFAULT_CATALOG = ORGANIZE_IT_ROOT / "data" / "asset_library" / "catalog.json"
+# Catalog follows the asset library (TIDY_ASSET_LIBRARY), NOT the organize_it repo,
+# so the two can point at different locations.
+DEFAULT_CATALOG = Path(os.environ.get(
+    "TIDY_ASSET_LIBRARY",
+    "/home/hjs/Projects/table_arrangement/organize_it_v2/data/asset_library",
+)) / "catalog.json"
 DEFAULT_CALIBRATION = REF_DIR / "camera_adjust_step15_calibration.json"
 DEFAULT_SETTLE_STEPS = 100
 
@@ -123,10 +134,7 @@ def add_calibrated_camera(mod, ts, camera_info: dict, near: float = 0.02, far: f
     return camera, T_world_from_cam
 
 
-def render_reference_goal(ts, out_path: Path, calibration_path: Path = DEFAULT_CALIBRATION) -> None:
-    mod = load_reference_module()
-    calibration = mod.preview._load_robotwin_camera_calibration(Path(calibration_path).expanduser().resolve())
-    camera, _ = add_calibrated_camera(mod, ts, calibration["camera"])
+def render_reference_goal(ts, out_path: Path, mod, camera) -> None:
     ts.scene.update_render()
     Image.fromarray(mod.capture_camera(camera)["rgb"]).save(out_path)
 
@@ -168,11 +176,17 @@ def write_depth(scene_dir: Path, prefix: str, depth_m: np.ndarray) -> None:
         pickle.dump(depth_mm, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def capture_current(ts, scene_dir: Path, scene_data: dict, asset_registry, calibration_path: Path = DEFAULT_CALIBRATION, prefix: str = "current") -> None:
-    mod = load_reference_module()
-    calibration = mod.preview._load_robotwin_camera_calibration(Path(calibration_path).expanduser().resolve())
-    camera_info = calibration["camera"]
-    camera, T_world_from_sapien_cam = add_calibrated_camera(mod, ts, camera_info)
+def capture_current(
+    ts,
+    scene_dir: Path,
+    scene_data: dict,
+    asset_registry,
+    mod,
+    camera,
+    camera_info: dict,
+    T_world_from_sapien_cam: np.ndarray,
+    prefix: str = "current",
+) -> None:
     table_top_z = float(scene_data["generation"]["table_height_m"])
     T_world_from_cam = T_world_from_sapien_cam.copy()
     T_world_from_cam[2, 3] -= table_top_z

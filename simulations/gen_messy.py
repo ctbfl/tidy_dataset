@@ -59,9 +59,46 @@ def is_anchor(size, height_thresh: float, area_thresh: float | None) -> bool:
     return bool(area_thresh and size[0] * size[1] >= area_thresh)
 
 
+def object_slot(ref: dict) -> str:
+    return f"{ref['category']}-{int(ref['set']) + 1}-{int(ref['slot']) + 1}"
+
+
+def on_top_slot_groups(
+    tidy_path: Path, tidy: dict, categories: list[str] | None = None
+) -> list[list[str]]:
+    """on_top_of object groups, each as slot keys. When ``categories`` is a
+    non-empty list, only keep groups that involve at least one object whose
+    category is listed (so ``--keep-on-top raw_meat`` restricts the rigid-group
+    logic to on_top relations touching raw_meat)."""
+    template_name = tidy.get("constraint_template")
+    if not template_name:
+        raise ValueError(f"{tidy_path} missing constraint_template")
+    constraint_path = tidy_path.parent.parent / "template" / "constraints" / f"{template_name}.json"
+    if not constraint_path.is_file():
+        raise FileNotFoundError(constraint_path)
+    constraints = json.loads(constraint_path.read_text()).get("constraints", [])
+    wanted = set(categories or [])
+    groups = []
+    for constraint in constraints:
+        if constraint.get("type") != "on_top_of":
+            continue
+        objects = constraint.get("objects", [])
+        if wanted and not any(ref.get("category") in wanted for ref in objects):
+            continue
+        slots = [object_slot(ref) for ref in objects]
+        if len(slots) >= 2:
+            groups.append(slots)
+    return groups
+
+
 def yaw_pose(x: float, y: float, z: float, yaw: float) -> sapien.Pose:
     """Upright object: pure z-translation + yaw about world z (stable frame)."""
     return sapien.Pose([x, y, z], [math.cos(yaw / 2), 0, 0, math.sin(yaw / 2)])
+
+
+def yaw_matrix(yaw: float) -> np.ndarray:
+    c, s = math.cos(yaw), math.sin(yaw)
+    return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], float)
 
 
 # -- rendering ------------------------------------------------------------- #
@@ -97,6 +134,31 @@ def silhouette(ts, cam, objs: dict, key: str):
     return int(mask.sum()), edges
 
 
+def silhouette_unit(ts, cam, objs: dict, keys: list[str]):
+    if len(keys) == 1:
+        return silhouette(ts, cam, objs, keys[0])
+    keyset = set(keys)
+    saved = {k: o.entity.get_pose() for k, o in objs.items()}
+    for k, o in objs.items():
+        if k not in keyset:
+            o.entity.set_pose(AWAY)
+    seg = segmentation(ts, cam)
+    for k, o in objs.items():
+        o.entity.set_pose(saved[k])
+    ids = [objs[key].entity.per_scene_id for key in keys]
+    mask = np.isin(seg, ids)
+    edges = (bool(mask[0, :].any()), bool(mask[-1, :].any()),
+             bool(mask[:, 0].any()), bool(mask[:, -1].any()))
+    return int(mask.sum()), edges
+
+
+def visible_unit_area(seg: np.ndarray, objs: dict, keys: list[str]) -> int:
+    ids = [objs[key].entity.per_scene_id for key in keys]
+    if len(ids) == 1:
+        return int((seg == ids[0]).sum())
+    return int(np.isin(seg, ids).sum())
+
+
 # -- per-scene generation -------------------------------------------------- #
 def clear_objects(ts) -> None:
     for o in list(ts.objects.values()):
@@ -129,7 +191,51 @@ def sample_layout(movers, anchors_xy, table, rng, gap, tries=200):
     return None
 
 
-def generate(ts, cam, tidy: dict, args, rng, cmask, obj_ids):
+def key_groups(slot_groups: list[list[str]], slot_to_key: dict[str, str]) -> list[list[str]]:
+    parent: dict[str, str] = {}
+
+    def find(key: str) -> str:
+        parent.setdefault(key, key)
+        if parent[key] != key:
+            parent[key] = find(parent[key])
+        return parent[key]
+
+    def union(a: str, b: str) -> None:
+        parent[find(b)] = find(a)
+
+    for slots in slot_groups:
+        keys = [slot_to_key[slot] for slot in slots if slot in slot_to_key]
+        if len(keys) >= 2:
+            first = keys[0]
+            for key in keys[1:]:
+                union(first, key)
+    groups: dict[str, list[str]] = {}
+    for key in parent:
+        groups.setdefault(find(key), []).append(key)
+    return [sorted(keys, key=int) for keys in groups.values() if len(keys) >= 2]
+
+
+def group_radius(keys: list[str], meta: dict) -> tuple[np.ndarray, float]:
+    origin = np.mean([meta[key]["tidy_transform"][:2, 3] for key in keys], axis=0)
+    radius = max(
+        float(np.linalg.norm(meta[key]["tidy_transform"][:2, 3] - origin)) + meta[key]["radius"]
+        for key in keys
+    )
+    return origin, radius
+
+
+def set_group_pose(objs: dict, meta: dict, keys: list[str], origin: np.ndarray, x: float, y: float, yaw: float) -> None:
+    rot = yaw_matrix(yaw)
+    target = np.array([x, y], float)
+    for key in keys:
+        transform = np.array(meta[key]["tidy_transform"], float)
+        rel_xy = transform[:2, 3] - origin
+        transform[:2, 3] = target + rot[:2, :2] @ rel_xy
+        transform[:3, :3] = rot @ transform[:3, :3]
+        objs[key].set_pose(sapien.Pose(transform))
+
+
+def generate(ts, cam, tidy: dict, args, rng, cmask, obj_ids, on_top_groups: list[list[str]] | None = None):
     table = tidy["table"]
     top = table["height"]
 
@@ -142,15 +248,19 @@ def generate(ts, cam, tidy: dict, args, rng, cmask, obj_ids):
 
     # spawn every tidy item; classify anchor (fixed pose) vs mover (scattered)
     objs, meta, anchors, movers = {}, {}, [], []
+    slot_to_key = {}
     for i, item in enumerate(tidy.get("items", [])):
         key = str(i)
         mn, mx, bottom_z, size = asset_aabb(item["asset_id"])
         obj = spawn(ts.scene, LIBRARY[item["asset_id"]], f'{item["asset_id"]}#{key}')
+        tidy_transform = np.asarray(item["transform"], float)
+        obj.set_pose(sapien.Pose(tidy_transform))
         ts.objects[key] = objs[key] = obj
         meta[key] = {"slot": item.get("slot"), "asset_id": item["asset_id"],
-                     "bottom_z": bottom_z, "radius": footprint_radius(mn, mx), "aabb_xy": (mn[:2] + mx[:2]) / 2}
-        if is_anchor(size, args.height_thresh, args.area_thresh):
-            obj.set_pose(sapien.Pose(np.asarray(item["transform"], float)))
+                     "bottom_z": bottom_z, "radius": footprint_radius(mn, mx),
+                     "tidy_transform": tidy_transform, "aabb_xy": (mn[:2] + mx[:2]) / 2}
+        slot_to_key[item.get("slot")] = key
+        if not getattr(args, "no_anchor", False) and is_anchor(size, args.height_thresh, args.area_thresh):
             anchors.append(key)
         else:
             movers.append(key)
@@ -159,38 +269,73 @@ def generate(ts, cam, tidy: dict, args, rng, cmask, obj_ids):
         return None, 0, "no items"
     obj_ids[:] = [o.entity.per_scene_id for o in objs.values()]
 
-    # Anchors keep their (trusted) tidy pose, so we don't reject them for
-    # touching a frame edge (a tall lamp legitimately reaches the top); we only
-    # need their unoccluded area, cached once since they never move.
-    anchor_full = {}
+    anchor_set = set(anchors)
+    mover_set = set(movers)
+    unit_members = {}
+    unit_origins = {}
+    mover_radii = []
+    fixed_units = []
+    grouped = set()
+    for keys in key_groups(on_top_groups or [], slot_to_key):
+        grouped.update(keys)
+        unit_id = "+".join(keys)
+        if anchor_set & set(keys):
+            for key in keys:
+                if key not in anchor_set:
+                    anchors.append(key)
+                    anchor_set.add(key)
+                mover_set.discard(key)
+            fixed_units.append((unit_id, keys))
+            continue
+        origin, radius = group_radius(keys, meta)
+        unit_members[unit_id] = keys
+        unit_origins[unit_id] = origin
+        mover_radii.append((unit_id, radius))
+    for key in movers:
+        if key in mover_set and key not in grouped:
+            unit_members[key] = [key]
+            mover_radii.append((key, meta[key]["radius"]))
     for key in anchors:
-        full, _ = silhouette(ts, cam, objs, key)
-        if full == 0:
-            return None, 0, f"anchor {meta[key]['slot'] or key} not visible in tidy"
-        anchor_full[key] = full
+        if key not in grouped:
+            fixed_units.append((key, [key]))
 
     anchors_xy = [(*objs[key].get_pose().p[:2], meta[key]["radius"]) for key in anchors]
-    mover_radii = [(key, meta[key]["radius"]) for key in movers]
+
+    # Anchors keep their tidy pose, so we don't reject them for touching a frame
+    # edge; we only need their unoccluded area, cached once since they never move.
+    fixed_full = {}
+    for unit_id, keys in fixed_units:
+        full, _ = silhouette_unit(ts, cam, objs, keys)
+        if full == 0:
+            slots = ",".join(meta[key]["slot"] or key for key in keys)
+            return None, 0, f"anchor {slots} not visible in tidy"
+        fixed_full[unit_id] = full
 
     for attempt in range(1, args.max_attempts + 1):
         layout = sample_layout(mover_radii, anchors_xy, table, rng, args.gap)
         if layout is None:
             continue
-        for key, (x, y, yaw) in layout.items():
-            objs[key].set_pose(yaw_pose(x, y, top - meta[key]["bottom_z"], yaw))
+        for unit_id, (x, y, yaw) in layout.items():
+            keys = unit_members[unit_id]
+            if len(keys) == 1:
+                key = keys[0]
+                objs[key].set_pose(yaw_pose(x, y, top - meta[key]["bottom_z"], yaw))
+            else:
+                set_group_pose(objs, meta, keys, unit_origins[unit_id], x, y, yaw)
 
         seg = segmentation(ts, cam)
         if np.isin(seg[cmask], obj_ids).any():          # something in a cropped corner
             continue
-        full = {**anchor_full}
+        full = {**fixed_full}
         cut = False
-        for key in movers:
-            full[key], (_, bottom, left, right) = silhouette(ts, cam, objs, key)
-            cut = cut or full[key] == 0 or bottom or left or right  # mover off the view edge
+        for unit_id, keys in unit_members.items():
+            full[unit_id], (_, bottom, left, right) = silhouette_unit(ts, cam, objs, keys)
+            cut = cut or full[unit_id] == 0 or bottom or left or right  # mover off the view edge
         if cut:
             continue
-        visible = {k: int((seg == objs[k].entity.per_scene_id).sum()) for k in objs}
-        if all(visible[k] / full[k] >= args.min_visible for k in objs):
+        units = [*fixed_units, *unit_members.items()]
+        visible = {unit_id: visible_unit_area(seg, objs, keys) for unit_id, keys in units}
+        if all(visible[unit_id] / full[unit_id] >= args.min_visible for unit_id, _ in units):
             items = [{"slot": meta[k]["slot"], "asset_id": meta[k]["asset_id"],
                       "transform": objs[k].get_pose().to_transformation_matrix().tolist()}
                      for k in objs]
@@ -211,6 +356,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--scenes", nargs="*", help="Limit to these scene folders (e.g. 001 002).")
     p.add_argument("--seed", type=int, default=0, help="RNG seed (offset per scene for independence).")
     p.add_argument("--overwrite", action="store_true", help="Regenerate scenes that already have messy.json.")
+    p.add_argument("--no-anchor", action="store_true", help="Scatter every object instead of keeping tall objects fixed.")
+    p.add_argument(
+        "--keep-on-top",
+        nargs="*",
+        default=None,
+        metavar="CATEGORY",
+        help="Move on_top_of-connected objects as one rigid group. Optionally pass "
+        "one or more categories (e.g. --keep-on-top raw_meat) to only apply this to "
+        "on_top relations involving those categories.",
+    )
     p.add_argument("--height-thresh", type=float, default=0.30, help="Anchor objects at least this tall (m).")
     p.add_argument("--area-thresh", type=float, default=None, help="Also anchor footprints >= this (m^2); off by default.")
     p.add_argument("--min-visible", type=float, default=0.80, help="Min unoccluded fraction per object.")
@@ -249,7 +404,12 @@ def main() -> None:
         LIBRARY.load_asset_json_backup(asset_json_backup_dir(tidy_path))
         tidy = json.loads(tidy_path.read_text())
         rng = random.Random(args.seed + idx)
-        items, attempts, status = generate(ts, cam, tidy, args, rng, cmask, [])
+        on_top_groups = (
+            on_top_slot_groups(tidy_path, tidy, args.keep_on_top)
+            if args.keep_on_top is not None
+            else []
+        )
+        items, attempts, status = generate(ts, cam, tidy, args, rng, cmask, [], on_top_groups)
         if items is None:
             print(f"[FAIL]  {d.name}: {status} ({attempts} attempts)")
             skipped += 1
@@ -258,7 +418,7 @@ def main() -> None:
         out_path.write_text(json.dumps(messy, indent=2, ensure_ascii=False))
         write_asset_json_backup(out_path, messy, LIBRARY)
         n_anchor = sum(1 for it in tidy.get("items", [])
-                       if is_anchor(asset_aabb(it["asset_id"])[3], args.height_thresh, args.area_thresh))
+                       if not args.no_anchor and is_anchor(asset_aabb(it["asset_id"])[3], args.height_thresh, args.area_thresh))
         print(f"[write] {args.scenario}/{d.name}/messy.json  "
               f"{len(items)} items ({n_anchor} anchored)  attempt {attempts}")
         written += 1
