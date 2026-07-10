@@ -7,8 +7,15 @@ import argparse
 from pathlib import Path
 
 
-ASSET_LIBRARY_DIR = "handcraft_bundle/asset_library"
-DATASET_DIR = "handcraft_bundle/data/organize_it_dataset_v2"
+# Defaults come from the env vars (set via setup_env.sh); fall back to our paths.
+ASSET_LIBRARY_DIR = os.environ.get(
+    "TIDY_ASSET_LIBRARY",
+    "/home/hjs/Projects/table_arrangement/organize_it_v2/data/asset_library",
+)
+DATASET_DIR = os.environ.get(
+    "TIDY_DATASET_DIR",
+    "/home/hjs/Projects/table_arrangement/tidy_dataset/data/organize_it_dataset_v2",
+)
 PORT = 8104
 
 
@@ -30,7 +37,7 @@ def main() -> int:
     if not (dataset / "available_assets.json").is_file():
         raise FileNotFoundError(dataset / "available_assets.json")
 
-    os.environ["TIDY_ASSET_LIBRARY_ROOT"] = str(asset_library)
+    os.environ["TIDY_ASSET_LIBRARY"] = str(asset_library)
     os.environ["TIDY_DATASET_DIR"] = str(dataset)
     sys.path.insert(0, str(root / "handcraft"))
     sys.path.insert(0, str(root / "simulations"))

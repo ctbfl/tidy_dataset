@@ -10,7 +10,9 @@ import sapien.core as sapien
 from pathlib import Path
 from sapien.render import set_global_config
 
-OUR_OTHER_ASSETS_ROOT = Path("/home/hjs/Projects/table_arrangement/tidy_dataset/assets")
+# Bundled textures / HDRIs shipped inside this repo (git-synced), so resolve
+# relative to the repo root rather than an absolute machine path.
+OUR_OTHER_ASSETS_ROOT = Path(__file__).resolve().parents[1] / "assets"
 
 from robotwin_migration import TidyScene # Base_Task class from RoboTwin, include lots of scene initialization functions.
 from objects import AssetLibrary, asset_json_backup_dir, spawn

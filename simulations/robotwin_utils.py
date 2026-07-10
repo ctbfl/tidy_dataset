@@ -6,7 +6,8 @@ from utils.actor_utils import Actor
 
 # Curated CC0 PBR texture sets: assets/textures/<kind>/<id>/ holding
 # albedo.jpg + normal.jpg + roughness.jpg + meta.json {"tile_m": <real-world size m>}.
-TEXTURE_ROOT = Path("/home/hjs/Projects/table_arrangement/tidy_dataset/assets/textures")
+# Shipped inside this repo (git-synced) -> resolve relative to the repo root.
+TEXTURE_ROOT = Path(__file__).resolve().parents[1] / "assets" / "textures"
 
 
 def curated_textures(kind: str) -> list[dict]:

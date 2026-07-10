@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -40,8 +41,17 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 V0_DIR = REPO_ROOT / "data" / "tidy_scene_v0"
-ORGANIZE_IT_ROOT = Path("/home/hjs/Projects/table_arrangement/organize_it_v2")
-DEFAULT_CATALOG = ORGANIZE_IT_ROOT / "data" / "asset_library" / "catalog.json"
+# organize_it repo root (src package + reference calibration). Independent from the
+# asset library and dataset dirs. Override with TIDY_ORGANIZE_IT_ROOT.
+ORGANIZE_IT_ROOT = Path(os.environ.get(
+    "TIDY_ORGANIZE_IT_ROOT",
+    "/home/hjs/Projects/table_arrangement/organize_it_v2",
+))
+# Catalog follows the asset library (TIDY_ASSET_LIBRARY), not the organize_it repo.
+DEFAULT_CATALOG = Path(os.environ.get(
+    "TIDY_ASSET_LIBRARY",
+    "/home/hjs/Projects/table_arrangement/organize_it_v2/data/asset_library",
+)) / "catalog.json"
 DEFAULT_CALIBRATION = (
     ORGANIZE_IT_ROOT
     / "experiments" / "pybullet_ur5_test_simple" / "camera_adjust_step15_calibration.json"
