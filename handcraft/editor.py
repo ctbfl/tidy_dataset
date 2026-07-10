@@ -46,6 +46,17 @@ def _aabb_corners(mn: np.ndarray, mx: np.ndarray) -> np.ndarray:
                      for z in (mn[2], mx[2])], dtype=float)
 
 
+def _as_mesh(loaded):
+    import trimesh
+
+    if isinstance(loaded, trimesh.Scene):
+        meshes = [mesh for mesh in loaded.geometry.values() if len(mesh.vertices)]
+        if not meshes:
+            raise ValueError("empty mesh scene")
+        return trimesh.util.concatenate(meshes)
+    return loaded
+
+
 def _dynamic(entity):
     """The rigid-body component we toggle for the vertical settle (None for articulations)."""
     return entity.find_component_by_type(sapien.physx.PhysxRigidDynamicComponent)
@@ -350,6 +361,26 @@ class SceneEditor:
         factor = float(np.mean(scale / base_scale))
         return mn * factor, mx * factor
 
+    def _wide_y_side(self, obj, mn: np.ndarray, mx: np.ndarray) -> float:
+        import trimesh
+
+        mesh = _as_mesh(trimesh.load(obj.asset.visual_mesh, force="mesh", process=False))
+        vertices = np.asarray(mesh.vertices, dtype=float)
+        scale = np.asarray(obj.asset.scale, dtype=float)
+        rotation = np.asarray(obj.asset.stable_rotation, dtype=float)
+        stable_vertices = (rotation @ (vertices * scale).T).T
+        split = float((mn[1] + mx[1]) * 0.5)
+
+        def xz_area(points: np.ndarray) -> float:
+            if len(points) == 0:
+                return 0.0
+            span = points[:, [0, 2]].max(axis=0) - points[:, [0, 2]].min(axis=0)
+            return float(span[0] * span[1])
+
+        positive_area = xz_area(stable_vertices[stable_vertices[:, 1] >= split])
+        negative_area = xz_area(stable_vertices[stable_vertices[:, 1] <= split])
+        return 1.0 if positive_area >= negative_area else -1.0
+
     def pen_in_holder(self, mover_id: str, holder_id: str, select: bool = True) -> None:
         if mover_id == holder_id:
             raise ValueError("moving object and holder must be different")
@@ -372,7 +403,13 @@ class SceneEditor:
             holder_aabb[1][2],
         ], dtype=float)
 
-        q = [float(np.sqrt(0.5)), float(np.sqrt(0.5)), 0.0, 0.0]  # stable +Y -> world +Z
+        try:
+            x_sign = self._wide_y_side(mover, mn, mx)
+        except Exception:
+            positive_y = max(float(mx[1]), 0.0)
+            negative_y = max(float(-mn[1]), 0.0)
+            x_sign = 1.0 if positive_y >= negative_y else -1.0
+        q = [float(np.sqrt(0.5)), float(x_sign * np.sqrt(0.5)), 0.0, 0.0]
         rot = sapien.Pose(q=q).to_transformation_matrix()[:3, :3]
         corners = (rot @ _aabb_corners(mn, mx).T).T
         bottom = corners[np.isclose(corners[:, 2], corners[:, 2].min())].mean(axis=0)

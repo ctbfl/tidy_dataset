@@ -115,6 +115,9 @@
   .asset-category.disabled { opacity: 0.68; }
   .asset-category-head { display: grid; grid-template-columns: 24px minmax(180px, 1fr) 90px auto; gap: 8px;
                          align-items: center; padding: 10px; background: #252a33; }
+  .asset-category-desc { width: calc(100% - 20px); margin: 8px 10px 0; padding: 6px 8px; font-size: 12px;
+                         color: #c7ccd6; background: #171a20; border: 1px solid #2e3540; border-radius: 5px; }
+  .asset-category-desc:focus { outline: none; border-color: #d9bd65; color: #eef1f6; }
   .asset-entry-grid { padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, 110px); gap: 9px; align-items: start; }
   .asset-entry { width: 110px; background: #13161c; border: 1px solid #2e3540; border-radius: 5px; padding: 6px; display: grid; gap: 6px; }
   .asset-entry.empty { border-style: dashed; }
@@ -129,12 +132,11 @@
                        text-align: center; font-size: 14px; padding: 0; cursor: pointer; display: none;
                        box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
   .asset-slot:hover .asset-slot-remove { display: block; }
-  .asset-slot-id { position: absolute; left: 0; top: calc(100% + 5px); display: none; z-index: 5;
+  .asset-slot-id { position: fixed; left: 0; top: 0; display: none; z-index: 30;
                    min-width: 220px; max-width: 720px; padding: 5px 8px; border-radius: 8px;
                    background: rgba(13,15,20,0.92); color: #eef1f6; border: 1px solid rgba(217,189,101,0.55);
                    font-size: 10px; line-height: 1.25; white-space: normal; overflow-wrap: anywhere;
                    box-shadow: 0 3px 10px rgba(0,0,0,0.35); pointer-events: none; }
-  .asset-slot:hover .asset-slot-id { display: block; }
   .empty-note { color: #798494; font-size: 12px; text-align: center; padding: 16px; }
   #assetRight { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   #assetBrowser { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px; gap: 8px; }
@@ -167,6 +169,7 @@
       <div id="assetControls" class="bar hidden" style="padding:0;border:0;background:transparent">
         <div class="row"><label>Category</label><input id="assetCategoryId" placeholder="category_id" /></div>
         <div class="row"><label>Slots</label><input id="assetSlotCount" type="number" min="1" value="1" /></div>
+        <div class="row"><label>Desc</label><input id="assetDescription" placeholder="类内可替换类目的描述" /></div>
         <button id="addAssetCategory">Add Category</button>
         <button id="saveAssets">Save</button>
         <div id="assetStatus"></div>
@@ -243,6 +246,7 @@ let state = null;
 let expanded = null;
 let relationMode = 'layout';
 let boxSelect = null;
+let midDrag = null;
 let suppressClick = false;
 let dragKey = null;
 let pendingRefPick = null;
@@ -281,6 +285,9 @@ ws.onmessage = (ev) => {
   img.src = 'data:image/jpeg;base64,' + msg.image;
   const previousTemplate = state ? state.template_name : null;
   state = msg.state;
+  // The server downgraded a scoped relation edit to a free move because the
+  // moved object was unrelated to the open relation — collapse it out of edit.
+  if (state.relation_edit_off) expanded = null;
   syncTextInputs(previousTemplate !== state.template_name || forcePromptSync);
   forcePromptSync = false;
   renderTemplateList();
@@ -372,13 +379,30 @@ function objectRow(obj) {
   row.draggable = true;
   row.addEventListener('dragstart', () => { dragKey = obj.key; });
   row.addEventListener('dragend', () => { dragKey = null; });
-  row.addEventListener('click', () => {
-    if (obj.scene_id) send({ type: 'select', scene_id: obj.scene_id });
+  row.addEventListener('click', (ev) => {
+    if (!obj.scene_id) return;
+    if (ev.ctrlKey || ev.metaKey) {
+      send({ type: 'toggle_select_key', key: obj.key });
+    } else {
+      send({ type: 'select', scene_id: obj.scene_id });
+    }
   });
   row.addEventListener('contextmenu', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
-    showSetMenu(ev.clientX, ev.clientY, obj.ref);
+    // On macOS Ctrl+click arrives as a contextmenu event, so treat it as a
+    // multi-select toggle instead of opening the clone-set menu.
+    if (ev.ctrlKey || ev.metaKey) {
+      if (obj.scene_id) send({ type: 'toggle_select_key', key: obj.key });
+      return;
+    }
+    // With a multi-selection active, mirror the workspace right-click and offer
+    // the relation menu instead of the (single-set) clone menu.
+    if ((state.selected_keys || []).length >= 2) {
+      showMenu(ev.clientX, ev.clientY);
+    } else {
+      showSetMenu(ev.clientX, ev.clientY, obj.ref);
+    }
   });
   const im = document.createElement('img');
   im.loading = 'lazy';
@@ -714,8 +738,19 @@ function drawSelectBox(a, b, rect) {
 }
 
 canvas.addEventListener('mousedown', (ev) => {
+  if (ev.button === 1) {
+    ev.preventDefault();
+    if (pendingRefPick) return;
+    hideMenu();
+    midDrag = toImage(ev);
+    setHint('middle-drag: release over the table to move the grabbed object there');
+    return;
+  }
   if (ev.button !== 0) return;
   if (pendingRefPick) return;
+  // Ctrl/Cmd+click is a select toggle (handled in click/contextmenu), not a
+  // box-select gesture — don't start a drag box for it.
+  if (ev.ctrlKey || ev.metaKey) return;
   ev.preventDefault();
   hideMenu();
   const p = canvasPoint(ev);
@@ -730,6 +765,16 @@ canvas.addEventListener('mousemove', (ev) => {
   drawSelectBox(boxSelect.start, p, p.rect);
 });
 document.addEventListener('mouseup', (ev) => {
+  if (midDrag && ev.button === 1) {
+    ev.preventDefault();
+    const start = midDrag;
+    midDrag = null;
+    setHint(null);
+    const end = toImage(ev);
+    if (Math.abs(start.x - end.x) < 4 && Math.abs(start.y - end.y) < 4) return;
+    send({ type: 'move_object', x0: start.x, y0: start.y, x1: end.x, y1: end.y });
+    return;
+  }
   if (!boxSelect) return;
   ev.preventDefault();
   const start = boxSelect.start;
@@ -764,10 +809,21 @@ canvas.addEventListener('click', (ev) => {
     setHint(null);
     return;
   }
+  if (ev.ctrlKey || ev.metaKey) {
+    send({ type: 'toggle_select_at', x: p.x, y: p.y });
+    return;
+  }
   send({ type: 'select_at', x: p.x, y: p.y });
 });
 canvas.addEventListener('contextmenu', (ev) => {
   ev.preventDefault();
+  // On macOS Ctrl+click arrives as a contextmenu event, so treat it as a
+  // multi-select toggle instead of opening the relation menu.
+  if (ev.ctrlKey || ev.metaKey) {
+    const p = toImage(ev);
+    send({ type: 'toggle_select_at', x: p.x, y: p.y });
+    return;
+  }
   showMenu(ev.clientX, ev.clientY);
 });
 canvas.addEventListener('dragover', (ev) => ev.preventDefault());
@@ -867,6 +923,60 @@ function showSetMenu(x, y, ref) {
   menu.style.display = 'block';
 }
 
+function positionAssetBubble(slot, bubble) {
+  bubble.style.display = 'block';
+  const rect = slot.getBoundingClientRect();
+  const bw = bubble.offsetWidth;
+  const bh = bubble.offsetHeight;
+  let left = rect.left;
+  let top = rect.bottom + 5;
+  if (left + bw > window.innerWidth - 6) left = Math.max(6, window.innerWidth - 6 - bw);
+  if (top + bh > window.innerHeight - 6) top = Math.max(6, rect.top - 5 - bh);
+  bubble.style.left = left + 'px';
+  bubble.style.top = top + 'px';
+}
+
+function showCopyMenu(x, y, text) {
+  const menu = $('menu');
+  menu.innerHTML = '';
+  const b = document.createElement('button');
+  b.textContent = 'copy obj_id';
+  b.addEventListener('click', () => {
+    hideMenu();
+    copyToClipboard(text);
+  });
+  menu.appendChild(b);
+  menu.style.left = Math.min(x, window.innerWidth - 250) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - 100) + 'px';
+  menu.style.display = 'block';
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => setAssetStatus(`copied: ${text}`))
+      .catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    setAssetStatus(`copied: ${text}`);
+  } catch (err) {
+    setAssetStatus(`copy failed: ${text}`, true);
+  }
+  document.body.removeChild(ta);
+}
+
 function assetCategoryKeys() {
   return Object.keys(assetConfig.available_assets);
 }
@@ -954,6 +1064,17 @@ function renderAssetCategory(parent, key, category) {
   });
   head.append(enabled, name, count, del);
   wrap.appendChild(head);
+
+  const desc = document.createElement('input');
+  desc.className = 'asset-category-desc';
+  desc.value = category.description || '';
+  desc.placeholder = '类内可替换类目的描述…';
+  desc.addEventListener('change', () => {
+    category.description = desc.value.trim();
+    assetConfig.available_assets[key] = category;
+  });
+  wrap.appendChild(desc);
+
   if (!isEnabled) {
     parent.appendChild(wrap);
     return;
@@ -1000,6 +1121,14 @@ function renderAssetSlot(key, category, visibleEntries, entryIndex, slotIndex, a
     bubble.className = 'asset-slot-id';
     bubble.textContent = assetId;
     slot.appendChild(bubble);
+    slot.addEventListener('mouseenter', () => positionAssetBubble(slot, bubble));
+    slot.addEventListener('mouseleave', () => { bubble.style.display = 'none'; });
+    slot.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      bubble.style.display = 'none';
+      showCopyMenu(ev.clientX, ev.clientY, assetId);
+    });
     const remove = document.createElement('button');
     remove.className = 'asset-slot-remove';
     remove.textContent = '×';
@@ -1069,6 +1198,7 @@ function resizeAssetCategory(key, value) {
 function addAssetCategory() {
   const categoryId = $('assetCategoryId').value.trim();
   const slotCount = Math.max(1, Math.floor(Number($('assetSlotCount').value) || 1));
+  const description = $('assetDescription').value.trim();
   if (!categoryId) {
     setAssetStatus('category_id is required', true);
     return;
@@ -1077,9 +1207,10 @@ function addAssetCategory() {
     setAssetStatus(`category exists: ${categoryId}`, true);
     return;
   }
-  assetConfig.available_assets[categoryId] = { slot_count: slotCount, entries: [] };
+  assetConfig.available_assets[categoryId] = { description, slot_count: slotCount, entries: [] };
   setAssetGroupEnabled(categoryId, true);
   $('assetCategoryId').value = '';
+  $('assetDescription').value = '';
   renderAssetCategories();
 }
 

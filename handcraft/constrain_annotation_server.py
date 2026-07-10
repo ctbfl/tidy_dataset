@@ -239,6 +239,7 @@ class ConstraintStudio:
         self.key_by_scene_id: dict[str, str] = {}
         self.placed_keys: set[str] = set()
         self.selected_keys: set[str] = set()
+        self._relation_edit_off = False
         self.fields: dict[str, dict] = {}
         self.selection_errors: list[str | None] = []
         self.relation_errors: list[str | None] = []
@@ -832,6 +833,17 @@ class ConstraintStudio:
             return
         self.apply_constraints({key})
 
+    def move_object(self, x0: int, y0: int, x1: int, y1: int) -> None:
+        """Middle-drag: grab the object under (x0, y0) — or the single selected
+        object — and move it to (x1, y1), exactly like a drop from the left panel."""
+        scene_id = self.editor.scene_id_at(int(x0), int(y0))
+        key = self.key_by_scene_id.get(scene_id or "")
+        if not key and len(self.selected_keys) == 1:
+            key = next(iter(self.selected_keys))
+        if not key:
+            raise ValueError("middle-drag: grab an object first")
+        self.place_object(key, int(x1), int(y1))
+
     def _move_center_to(self, obj, x: float | None = None, y: float | None = None) -> None:
         aabb = _world_aabb(obj.entity)
         center = (aabb[0] + aabb[1]) * 0.5
@@ -886,6 +898,12 @@ class ConstraintStudio:
     def select_at(self, x: int, y: int) -> None:
         self.editor.select_at(x, y)
         self.select_scene_id(self.editor.selected)
+
+    def toggle_select_at(self, x: int, y: int) -> None:
+        scene_id = self.editor.scene_id_at(int(x), int(y))
+        key = self.key_by_scene_id.get(scene_id or "")
+        if key:
+            self.toggle_select_key(key)
 
     def select_rect(self, x0: int, y0: int, x1: int, y1: int) -> None:
         self.clear_highlight()
@@ -943,6 +961,7 @@ class ConstraintStudio:
         if not refs:
             raise ValueError("select at least one object")
         relation = self._default_relation(relation_type, refs)
+        self._auto_assign_anchor(relation)
         self._init_relation_params_from_current(relation, None)
         self.constraints.append(relation)
         if reason := self._incomplete_reason(relation):
@@ -1048,6 +1067,50 @@ class ConstraintStudio:
                 raise ValueError("pen_in_holder needs exactly two selected objects")
             return {"type": relation_type, "objects": refs}
         raise ValueError(f"unknown relation type: {relation_type}")
+
+    def _anchor_field(self, relation: dict) -> str | None:
+        """Name of the field ('anchor'/'holder') this relation resolves against,
+        or None for relations whose anchor is not defined by object fields."""
+        kind = relation["type"]
+        if kind == "pen_in_holder":
+            return "holder"
+        if kind in ("in_same_vertical_line", "in_same_horizontal_line",
+                    "evenly_spaced_from_anchor", "x_offset_from", "y_offset_from",
+                    "xy_offset_from"):
+            return "anchor"
+        return None
+
+    def _anchor_required_fields(self, relation: dict) -> list[str] | None:
+        """Fields that _apply_relation will _require of the anchor. An object can
+        only serve as this relation's anchor once these fields are defined."""
+        kind = relation["type"]
+        if kind in ("in_same_vertical_line", "x_offset_from"):
+            return ["x"]
+        if kind in ("in_same_horizontal_line", "y_offset_from"):
+            return ["y"]
+        if kind in ("xy_offset_from", "pen_in_holder"):
+            return ["x", "y"]
+        if kind == "evenly_spaced_from_anchor":
+            refs = self._relation_refs(relation)
+            axis = relation.get("axis") if relation.get("axis") in ("x", "y") else self._axis_from_current_bbox(refs)
+            return [axis]
+        return None
+
+    def _auto_assign_anchor(self, relation: dict) -> None:
+        """If exactly one of the relation's objects already satisfies the anchor
+        field requirements, pick it as anchor so annotation goes faster."""
+        field = self._anchor_field(relation)
+        if field is None or relation.get(field):
+            return
+        required = self._anchor_required_fields(relation)
+        if not required:
+            return
+        qualified = [
+            ref for ref in self._relation_refs(relation)
+            if all(self.fields.get(_ref_key(ref), {}).get(name) is not None for name in required)
+        ]
+        if len(qualified) == 1:
+            relation[field] = qualified[0]
 
     def _even_spacing_complete(self, relation: dict) -> bool:
         return (
@@ -1720,6 +1783,13 @@ class ConstraintStudio:
         selected = [k for k in sorted(self.selected_keys, key=lambda k: self.number_by_key[k]) if k in self.scene_ids]
         if not selected:
             return
+        # If the user is nudging objects that the open relation does not touch,
+        # don't block the move — downgrade to a free move and tell the frontend
+        # to collapse the relation out of edit mode.
+        if relation_index is not None and 0 <= relation_index < len(self.constraints):
+            if not (set(selected) & self._relation_keys(self.constraints[relation_index])):
+                relation_index = None
+                self._relation_edit_off = True
         self._pending_support_snapshot = self._make_support_snapshot()
         field = "rotation" if name in "qe" else ("x" if name in "ad" else "y")
         allowed = self._allowed_keys_for_key_edit(field, relation_index)
@@ -1896,6 +1966,8 @@ class ConstraintStudio:
         return str(self.number_by_key.get(key, key))
 
     def state(self) -> dict:
+        relation_edit_off = self._relation_edit_off
+        self._relation_edit_off = False
         records = []
         for record in self._object_records():
             key = record["key"]
@@ -1924,6 +1996,7 @@ class ConstraintStudio:
             "relation_errors": self.relation_errors,
             "relation_incomplete": self.relation_incomplete,
             "selected_keys": list(self.selected_keys),
+            "relation_edit_off": relation_edit_off,
             "templates": self.list_constraint_templates(),
         }
 
@@ -2038,12 +2111,16 @@ async def ws(socket: WebSocket):
                         studio.delete_object(msg["key"])
                     elif kind == "place_object":
                         studio.place_object(msg["key"], int(msg["x"]), int(msg["y"]))
+                    elif kind == "move_object":
+                        studio.move_object(msg["x0"], msg["y0"], msg["x1"], msg["y1"])
                     elif kind == "select":
                         studio.select_scene_id(msg["scene_id"])
                     elif kind == "toggle_select_key":
                         studio.toggle_select_key(msg["key"])
                     elif kind == "select_at":
                         studio.select_at(msg["x"], msg["y"])
+                    elif kind == "toggle_select_at":
+                        studio.toggle_select_at(msg["x"], msg["y"])
                     elif kind == "select_rect":
                         studio.select_rect(msg["x0"], msg["y0"], msg["x1"], msg["y1"])
                     elif kind == "add_relation":
