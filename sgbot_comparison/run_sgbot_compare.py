@@ -60,7 +60,7 @@ SETTLE_MAX_STEPS = 5000
 SETTLE_MIN_STEPS = 20
 SETTLE_STABLE_STEPS = 20
 SETTLE_LIN_EPS = 0.01
-SETTLE_ANG_EPS = 0.1
+SETTLE_ANG_EPS = 0.2
 COLLISION_LIFT_STEP = 0.01
 COLLISION_LIFT_MAX_STEPS = 40
 COLLISION_PENETRATION_TOL = 1e-4
@@ -253,6 +253,10 @@ def load_context(scene_dir: Path, out_dir_name: str) -> dict:
 
     out_dir = scene_dir / out_dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
+    steps_dir = out_dir / "steps"
+    if steps_dir.exists():
+        shutil.rmtree(steps_dir)
+    steps_dir.mkdir()
     for video_path in out_dir.glob("step_*.mp4"):
         video_path.unlink()
     for frame_path in out_dir.glob("teleport_frame*.png"):
@@ -301,6 +305,7 @@ def load_context(scene_dir: Path, out_dir_name: str) -> dict:
         "extrinsics": extrinsics,
         "ta_scene": ta_scene,
         "synthetic_view": synthetic_view,
+        "steps_dir": steps_dir,
         "sim_by_class": sim_by_class,
         "table_aabb_xy": table_aabb_xy,
     }
@@ -320,7 +325,13 @@ def copy_with_obstacle_outputs_to_no_obstacle(scene_dir: Path) -> bool:
     source_out = scene_dir / "our_output"
     source_video = source_out / "teleport.mp4"
     source_log = source_out / "teleport.log"
-    if not (source_result.is_file() and source_video.is_file() and source_log.is_file()):
+    source_steps = source_out / "steps"
+    if not (
+        source_result.is_file()
+        and source_video.is_file()
+        and source_log.is_file()
+        and (source_steps / "final.json").is_file()
+    ):
         return False
 
     target_result = scene_dir / "our_result_no_obstacle.png"
@@ -341,9 +352,13 @@ def copy_with_obstacle_outputs_to_no_obstacle(scene_dir: Path) -> bool:
         path = target_out / name
         if path.exists():
             path.unlink()
+    target_steps = target_out / "steps"
+    if target_steps.exists():
+        shutil.rmtree(target_steps)
 
     shutil.copy2(source_result, target_result)
     shutil.copy2(source_video, target_out / "teleport.mp4")
+    shutil.copytree(source_steps, target_steps)
     copied_log = (
         "[copy] scene has no obstacle; copied existing with-obstacle output\n"
         f"[copy-source] {source_out}\n"
@@ -481,6 +496,87 @@ def snapshot_body_poses(pb: Any, env: Any) -> dict[str, tuple[list[float], list[
     return poses
 
 
+def pose_matrix_json(pose: np.ndarray) -> dict[str, list[float]]:
+    import pybullet_utils.transformations as trans
+
+    mat = np.eye(4, dtype=np.float64)
+    mat[:3, :3] = pose[:3, :3]
+    quat = trans.quaternion_from_matrix(mat)
+    return {
+        "pos": [float(x) for x in pose[:3, 3]],
+        "quat_xyzw": [float(x) for x in quat],
+    }
+
+
+def snapshot_step_state(
+    pb: Any,
+    env: Any,
+    ctx: dict,
+    *,
+    phase: str,
+    step_index: int,
+    action: dict[str, Any] | None,
+    completed: bool = False,
+) -> dict[str, Any]:
+    objects = {}
+    for cls, sim_obj in sorted(ctx["sim_by_class"].items()):
+        bid = env.pybullet_id_dict[sim_obj["name"]]
+        pos, quat = pb.getBasePositionAndOrientation(bid)
+        aabb_min, aabb_max = pb.getAABB(bid)
+        objects[cls] = {
+            "class": cls,
+            "name": sim_obj["name"],
+            "instance": sim_obj.get("instance", sim_obj["name"]),
+            "pos": [float(x) for x in pos],
+            "quat_xyzw": [float(x) for x in quat],
+            "aabb_min": [float(x) for x in aabb_min],
+            "aabb_max": [float(x) for x in aabb_max],
+        }
+
+    table_aabb_min, table_aabb_max = pb.getAABB(env.pybullet_id_dict["support_table"])
+    state = {
+        "schema_version": 1,
+        "scene_id": ctx["scene_dir"].name,
+        "phase": phase,
+        "step_index": int(step_index),
+        "action": action,
+        "frame": {
+            "name": "pybullet_sim_world",
+            "table_height": float(env.table_height),
+            "table_aabb_min": [float(x) for x in table_aabb_min],
+            "table_aabb_max": [float(x) for x in table_aabb_max],
+        },
+        "objects": objects,
+    }
+    if completed:
+        state["completed"] = True
+    return state
+
+
+def write_step_state(
+    pb: Any,
+    env: Any,
+    ctx: dict,
+    path: Path,
+    *,
+    phase: str,
+    step_index: int,
+    action: dict[str, Any] | None,
+    completed: bool = False,
+) -> dict[str, Any]:
+    state = snapshot_step_state(
+        pb,
+        env,
+        ctx,
+        phase=phase,
+        step_index=step_index,
+        action=action,
+        completed=completed,
+    )
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n")
+    return state
+
+
 def render_clean_tiny_final_in_subprocess(
     ctx: dict,
     body_poses: dict[str, tuple[list[float], list[float]]],
@@ -557,6 +653,25 @@ pb.disconnect()
     finally:
         if pose_path.exists():
             pose_path.unlink()
+
+
+def run_offline_verifier(ctx: dict, log: Any) -> None:
+    verifier = Path(__file__).with_name("verify_teleport_steps.py")
+    result = subprocess.run(
+        [sys.executable, str(verifier), str(ctx["steps_dir"])],
+        text=True,
+        capture_output=True,
+    )
+    if result.stdout.strip():
+        log("[offline-verify] stdout:")
+        for line in result.stdout.strip().splitlines():
+            log(f"[offline-verify] {line}")
+    if result.stderr.strip():
+        log("[offline-verify] stderr:")
+        for line in result.stderr.strip().splitlines():
+            log(f"[offline-verify] {line}")
+    if result.returncode != 0:
+        raise RuntimeError(f"offline verifier failed with exit code {result.returncode}")
 
 
 class VideoRecorder:
@@ -779,6 +894,15 @@ def run_scene(scene_dir: Path, no_obstacle: bool, run_vlm: bool) -> None:
         f"fx={video_camera['fx']:.3f} fy={video_camera['fy']:.3f}"
     )
     capture_video_frame(pb, recorder, video_camera)
+    write_step_state(
+        pb,
+        env,
+        ctx,
+        ctx["steps_dir"] / "step_init.json",
+        phase="init",
+        step_index=0,
+        action=None,
+    )
 
     local_clouds = {
         cls: object_local_cloud(sim_obj)
@@ -812,14 +936,19 @@ def run_scene(scene_dir: Path, no_obstacle: bool, run_vlm: bool) -> None:
             log(f"[lift] {cls}: target mesh below table, z += {lift:.3f}m")
         log(f"[plan] {cls}: target xy=({target_pose[cls][0, 3]:.3f}, {target_pose[cls][1, 3]:.3f})")
 
-    from organize_it.modules.teleport_video import build_v3_plan
+    from organize_it.modules.teleport_video import build_v0703_plan
 
-    plan = build_v3_plan(ctx["scene_dir"])
+    plan = build_v0703_plan(ctx["scene_dir"])
     buffer_count = sum(1 for step_info in plan if step_info.get("kind") == "buffer")
-    log(f"[planner-v3] using dependency plan: {len(plan)} steps ({buffer_count} buffer detours)")
+    log(f"[planner-v0703] using dependency plan: {len(plan)} steps ({buffer_count} buffer detours)")
 
     finished: set[str] = set()
     step = 0
+    last_action: dict[str, Any] | None = None
+    prev_plan_pose = {
+        cls: np.asarray(ctx["ta_scene"].objects[cls].any6d_original_pose, dtype=np.float64).reshape(4, 4).copy()
+        for cls in sim_by_class
+    }
     for step_info in plan:
         cls = step_info.get("obj_id")
         if cls not in sim_by_class:
@@ -828,13 +957,16 @@ def run_scene(scene_dir: Path, no_obstacle: bool, run_vlm: bool) -> None:
         sim_obj = sim_by_class[cls]
         bid = env.pybullet_id_dict[sim_obj["name"]]
         step += 1
+        action: dict[str, Any]
 
         if kind == "buffer":
             if "target_world_pose" not in step_info:
                 raise KeyError(f"planner buffer step missing target_world_pose: {step_info}")
-            buffer_pose = table_pose_to_sim(
-                np.asarray(step_info["target_world_pose"], dtype=np.float64),
-                float(env.table_height),
+            target_plan_pose = np.asarray(step_info["target_world_pose"], dtype=np.float64).reshape(4, 4)
+            planner_delta = target_plan_pose @ np.linalg.inv(prev_plan_pose[cls])
+            buffer_pose = transformed_pose(
+                table_frame_transform_to_sim(planner_delta, float(env.table_height)),
+                current_pose[cls],
             )
             buffer_pose, lift = lift_pose_to_table(
                 buffer_pose,
@@ -847,6 +979,12 @@ def run_scene(scene_dir: Path, no_obstacle: bool, run_vlm: bool) -> None:
             )
             if lift:
                 log(f"[lift] buffer {cls}: target mesh below table, z += {lift:.3f}m")
+            action = {
+                "kind": "buffer",
+                "object_class": cls,
+                "object_name": sim_obj["name"],
+                "target_pose_sim": pose_matrix_json(buffer_pose),
+            }
             settled_steps = teleport_pose_and_settle(
                 pb,
                 env,
@@ -857,9 +995,17 @@ def run_scene(scene_dir: Path, no_obstacle: bool, run_vlm: bool) -> None:
                 video_camera,
             )
             log(f"[settle] buffer {cls}: {settled_steps} sim steps")
+            prev_plan_pose[cls] = target_plan_pose.copy()
         elif kind == "goal":
             if rel_pose_by_class[cls] is None:
                 log(f"[step {step}] move {cls} with rel_pose=None (SG-Bot move-away)")
+                action = {
+                    "kind": "goal",
+                    "object_class": cls,
+                    "object_name": sim_obj["name"],
+                    "target_pose_sim": None,
+                    "move_away": True,
+                }
                 settled_steps = teleport_rel_pose_and_settle(
                     pb,
                     env,
@@ -874,6 +1020,13 @@ def run_scene(scene_dir: Path, no_obstacle: bool, run_vlm: bool) -> None:
                     f"[step {step}] move {cls} -> absolute goal "
                     f"({target_pose[cls][0, 3]:.3f}, {target_pose[cls][1, 3]:.3f})"
                 )
+                action = {
+                    "kind": "goal",
+                    "object_class": cls,
+                    "object_name": sim_obj["name"],
+                    "target_pose_sim": pose_matrix_json(target_pose[cls]),
+                    "move_away": False,
+                }
                 settled_steps = teleport_pose_and_settle(
                     pb,
                     env,
@@ -885,18 +1038,49 @@ def run_scene(scene_dir: Path, no_obstacle: bool, run_vlm: bool) -> None:
                 )
             log(f"[settle] {cls}: {settled_steps} sim steps")
             finished.add(cls)
+            if "target_world_pose" in step_info:
+                prev_plan_pose[cls] = np.asarray(step_info["target_world_pose"], dtype=np.float64).reshape(4, 4).copy()
         else:
             raise ValueError(f"unknown planner step kind: {kind}")
 
         pos, quat = pb.getBasePositionAndOrientation(bid)
         current_pose[cls] = pose_from_pos_quat(pos, quat)
+        action["settled_steps"] = int(settled_steps)
+        action["final_pose_sim"] = {
+            "pos": [float(x) for x in pos],
+            "quat_xyzw": [float(x) for x in quat],
+        }
         if kind == "goal" and rel_pose_by_class[cls] is not None:
             xy_err = float(np.linalg.norm(current_pose[cls][:2, 3] - target_pose[cls][:2, 3]))
             z_err = float(current_pose[cls][2, 3] - target_pose[cls][2, 3])
+            action["verify_error"] = {
+                "xy_m": xy_err,
+                "z_m": z_err,
+            }
             log(f"[verify] {cls}: final xy err={xy_err:.3f}m z err={z_err:.3f}m")
+        write_step_state(
+            pb,
+            env,
+            ctx,
+            ctx["steps_dir"] / f"step_{step}.json",
+            phase="step",
+            step_index=step,
+            action=action,
+        )
+        last_action = action
 
     movable = set(sim_by_class)
     log(f"[done] moved {len(finished)}/{len(movable)} objects")
+    write_step_state(
+        pb,
+        env,
+        ctx,
+        ctx["steps_dir"] / "final.json",
+        phase="final",
+        step_index=step,
+        action=last_action,
+        completed=True,
+    )
     final_body_poses = snapshot_body_poses(pb, env)
     recorder.close()
     log(f"[video] frames={recorder.frame_count} fps={VIDEO_FPS} path={ctx['out_dir'] / 'teleport.mp4'}")
@@ -905,6 +1089,11 @@ def run_scene(scene_dir: Path, no_obstacle: bool, run_vlm: bool) -> None:
     render_clean_tiny_final_in_subprocess(ctx, final_body_poses, result_path)
     log(f"[render] final still clean subprocess TinyRenderer path={result_path}")
     ctx["synthetic_view"].unlink()
+    try:
+        run_offline_verifier(ctx, log)
+    except Exception:
+        (ctx["out_dir"] / "teleport.log").write_text("\n".join(log_lines) + "\n")
+        raise
     (ctx["out_dir"] / "teleport.log").write_text("\n".join(log_lines) + "\n")
     if run_vlm:
         from run_vlm_compare import run as run_vlm_compare
