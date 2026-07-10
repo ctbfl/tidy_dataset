@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>候选类目标注</title>
+<style>
+  :root {
+    --bg: #14161a; --panel: #1c1f26; --panel2: #22262f; --line: #2e333d;
+    --ink: #e6e8ec; --dim: #949aa6; --accent: #5b9dff; --danger: #ff6b6b;
+    --good: #35c08a; --warn: #e0a23a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--ink); }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line);
+           background: var(--panel2); color: var(--ink); border-radius: 7px; padding: 5px 11px; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #06101f; font-weight: 600; }
+  button.ghost { background: transparent; }
+  input, textarea, select { font: inherit; background: var(--panel); color: var(--ink);
+           border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+
+  header { position: sticky; top: 0; z-index: 20; background: rgba(20,22,26,.92);
+    backdrop-filter: blur(6px); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 14px; padding: 10px 18px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 650; }
+  header .stats { color: var(--dim); font-size: 12.5px; }
+  header .spacer { flex: 1; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); display: inline-block; }
+  .dot.dirty { background: var(--warn); }
+
+  main { padding: 16px 18px 120px; max-width: 1180px; margin: 0 auto; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+
+  .cat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+         margin-bottom: 16px; overflow: hidden; }
+  .cat-head { display: flex; align-items: center; gap: 10px; padding: 11px 13px; }
+  .cat-head input.name { font-weight: 650; font-size: 15px; width: 220px; }
+  .cat-head .count { color: var(--dim); font-size: 12.5px; white-space: nowrap; }
+  .cat-head .spacer { flex: 1; }
+  .cat-desc { width: calc(100% - 26px); margin: 0 13px 10px; resize: vertical; min-height: 34px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+          gap: 9px; padding: 0 13px 13px; }
+  .thumb { position: relative; background: var(--panel2); border: 1px solid var(--line);
+           border-radius: 9px; padding: 6px; text-align: center; }
+  .thumb img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; border-radius: 6px; }
+  .thumb .cap { font-size: 10.5px; color: var(--dim); word-break: break-all; margin-top: 4px; line-height: 1.3; }
+  .thumb .sz { font-size: 10px; color: #6f7684; }
+  .thumb .x { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; line-height: 1;
+    padding: 0; border-radius: 50%; background: rgba(20,22,26,.75); border-color: transparent; color: var(--danger); font-size: 15px; }
+  .thumb .x:hover { background: var(--danger); color: #fff; }
+  .badge { display: inline-block; font-size: 9.5px; padding: 1px 5px; border-radius: 5px;
+    background: #3a2f18; color: var(--warn); border: 1px solid #5a4720; }
+  .add-btn { margin: 0 13px 14px; }
+
+  /* add drawer */
+  #drawer { position: fixed; top: 0; right: 0; width: 460px; max-width: 92vw; height: 100vh;
+    background: var(--panel); border-left: 1px solid var(--line); z-index: 40;
+    transform: translateX(100%); transition: transform .18s ease; display: flex; flex-direction: column; }
+  #drawer.open { transform: none; }
+  #drawer .dhead { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  #drawer .dhead .t { font-weight: 650; }
+  #drawer .filters { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 9px; }
+  #drawer .filters input[type=text] { flex: 1; min-width: 130px; }
+  #drawer .chk { font-size: 12px; color: var(--dim); display: inline-flex; align-items: center; gap: 4px; }
+  #drawer .dbody { overflow: auto; padding: 11px 14px; flex: 1; }
+  #drawer .dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px,1fr)); gap: 8px; }
+  #drawer .pick { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 5px; text-align: center; cursor: pointer; }
+  #drawer .pick:hover { border-color: var(--accent); }
+  #drawer .pick.added { opacity: .4; pointer-events: none; }
+  #drawer .pick.elsewhere { border-color: var(--warn); }
+  #drawer .pick img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; border-radius: 5px; }
+  #drawer .pick .cap { font-size: 9.5px; color: var(--dim); word-break: break-all; margin-top: 3px; }
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 35; display: none; }
+  #overlay.open { display: block; }
+  .muted { color: var(--dim); }
+  .empty { color: var(--dim); padding: 10px 13px 16px; font-style: italic; }
+</style>
+</head>
+<body>
+<header>
+  <h1>候选类目标注</h1>
+  <span class="stats" id="stats">加载中…</span>
+  <span class="spacer"></span>
+  <span class="dot" id="dot"></span>
+  <button id="newCat">＋ 新建类目</button>
+  <button class="primary" id="save">保存 (⌘/Ctrl+S)</button>
+</header>
+
+<main>
+  <div class="toolbar">
+    <input type="text" id="catFilter" placeholder="过滤类目名 / 描述…" style="width:260px" />
+    <span class="muted" id="filePath"></span>
+  </div>
+  <div id="cats"></div>
+</main>
+
+<div id="overlay"></div>
+<aside id="drawer">
+  <div class="dhead">
+    <div class="t">添加物体到 <span id="drawerTarget" style="color:var(--accent)"></span></div>
+    <div class="filters">
+      <input type="text" id="q" placeholder="搜索 id / label / tag…" />
+      <select id="fSource"><option value="">全部来源</option></select>
+      <select id="fTag"><option value="">全部 tag</option></select>
+    </div>
+    <div class="filters" style="margin-top:6px">
+      <label class="chk"><input type="checkbox" id="onlyUnassigned" /> 仅未分配到任何候选</label>
+      <label class="chk"><input type="checkbox" id="onlyNotInAvail" /> 仅 available 未使用</label>
+      <span class="spacer" style="flex:1"></span>
+      <button class="ghost" id="drawerClose">关闭</button>
+    </div>
+  </div>
+  <div class="dbody"><div class="dgrid" id="dgrid"></div></div>
+</aside>
+
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+let META = null;          // {sources, tags, ...}
+let ALL_ASSETS = null;    // full library list (lazy loaded once)
+let STATE = { version:1, note:"", categories:[] };  // categories: [{name, description, ids:[]}]
+let dirty = false;
+let drawerCat = null;     // index of category the drawer targets
+
+function setDirty(v){ dirty = v; $("#dot").classList.toggle("dirty", v); }
+
+function assignedElsewhere(exceptIdx){
+  const m = new Map();  // id -> category name (first hit not in exceptIdx)
+  STATE.categories.forEach((c,i) => {
+    if (i === exceptIdx) return;
+    c.ids.forEach(id => { if (!m.has(id)) m.set(id, c.name); });
+  });
+  return m;
+}
+function allAssignedSet(){
+  const s = new Set();
+  STATE.categories.forEach(c => c.ids.forEach(id => s.add(id)));
+  return s;
+}
+
+function renderStats(){
+  const nCat = STATE.categories.length;
+  const nAsset = allAssignedSet().size;
+  $("#stats").textContent = `${nCat} 个类目 · ${nAsset} 个资产已分配 · 库存共 ${META?.library_count ?? "?"}`;
+}
+
+function thumbURL(id){ return "/preview?asset_id=" + encodeURIComponent(id); }
+function fmtSize(sz){ return sz ? sz.map(v=>v.toFixed(2)).join("×") : ""; }
+
+function renderCats(){
+  const host = $("#cats"); host.innerHTML = "";
+  const filter = $("#catFilter").value.toLowerCase().trim();
+  const elsewhereByCat = STATE.categories.map((_,i)=>assignedElsewhere(i));
+  STATE.categories.forEach((cat, idx) => {
+    if (filter && !(cat.name.toLowerCase().includes(filter) || (cat.description||"").toLowerCase().includes(filter))) return;
+    const el = document.createElement("div"); el.className = "cat";
+    const elsewhere = elsewhereByCat[idx];
+    el.innerHTML = `
+      <div class="cat-head">
+        <input class="name" value="${escapeAttr(cat.name)}" />
+        <span class="count">${cat.ids.length} 个</span>
+        <span class="spacer"></span>
+        <button class="ghost del-cat" title="删除整个类目">删除类目</button>
+      </div>
+      <textarea class="cat-desc" placeholder="描述…">${escapeHtml(cat.description||"")}</textarea>
+      <div class="grid"></div>
+      <button class="add-btn ghost">＋ 添加物体</button>
+    `;
+    const nameEl = $(".name", el);
+    nameEl.addEventListener("change", () => { cat.name = nameEl.value.trim(); setDirty(true); renderStats(); });
+    $(".cat-desc", el).addEventListener("change", e => { cat.description = e.target.value; setDirty(true); });
+    $(".del-cat", el).addEventListener("click", () => {
+      if (!confirm(`删除类目「${cat.name}」? 其 ${cat.ids.length} 个资产将变为未分配。`)) return;
+      STATE.categories.splice(idx,1); setDirty(true); renderCats(); renderStats();
+    });
+    $(".add-btn", el).addEventListener("click", () => openDrawer(idx));
+    const grid = $(".grid", el);
+    if (!cat.ids.length) grid.innerHTML = `<div class="empty">（空类目，点“添加物体”）</div>`;
+    cat.ids.forEach(id => {
+      const t = document.createElement("div"); t.className = "thumb";
+      const badge = elsewhere.has(id) ? `<div class="badge" title="也在其它类目">也在 ${escapeHtml(elsewhere.get(id))}</div>` : "";
+      t.innerHTML = `
+        <button class="x" title="从该类目移除">×</button>
+        <img loading="lazy" src="${thumbURL(id)}" alt="${escapeAttr(id)}" />
+        <div class="cap">${escapeHtml(shortId(id))}</div>
+        <div class="sz">${fmtSize(sizeOf(id))}</div>
+        ${badge}
+      `;
+      $(".x", t).addEventListener("click", () => {
+        cat.ids = cat.ids.filter(x => x !== id); setDirty(true); renderCats(); renderStats();
+      });
+      grid.appendChild(t);
+    });
+    host.appendChild(el);
+  });
+}
+
+function shortId(id){ const p = id.split(":"); return p.length>=3 ? p.slice(2).join(":") : id; }
+function sizeOf(id){ return ALL_ASSETS?.find?.(a=>a.id===id)?.size ?? null; }
+function escapeHtml(s){ return (s||"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function escapeAttr(s){ return (s||"").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+
+// ---------- add drawer ----------
+async function ensureAssets(){
+  if (ALL_ASSETS) return;
+  ALL_ASSETS = await (await fetch("/assets")).json();
+}
+async function openDrawer(idx){
+  drawerCat = idx;
+  $("#drawerTarget").textContent = STATE.categories[idx].name;
+  $("#overlay").classList.add("open"); $("#drawer").classList.add("open");
+  await ensureAssets();
+  renderDrawer();
+}
+function closeDrawer(){ $("#overlay").classList.remove("open"); $("#drawer").classList.remove("open"); drawerCat = null; }
+
+function renderDrawer(){
+  if (drawerCat == null) return;
+  const cat = STATE.categories[drawerCat];
+  const q = $("#q").value.toLowerCase().trim();
+  const src = $("#fSource").value, tg = $("#fTag").value;
+  const onlyUn = $("#onlyUnassigned").checked, onlyNIA = $("#onlyNotInAvail").checked;
+  const assignedAll = allAssignedSet();
+  const elsewhere = assignedElsewhere(drawerCat);
+  const inThis = new Set(cat.ids);
+  const grid = $("#dgrid"); grid.innerHTML = "";
+  let shown = 0;
+  for (const a of ALL_ASSETS){
+    if (src && a.source !== src) continue;
+    if (tg && !a.tags.includes(tg)) continue;
+    if (onlyNIA && a.in_available) continue;
+    if (onlyUn && assignedAll.has(a.id) && !inThis.has(a.id)) continue;
+    if (q){ const blob = (a.id+" "+a.label+" "+a.tags.join(" ")).toLowerCase(); if (!blob.includes(q)) continue; }
+    if (shown++ > 400) break;
+    const added = inThis.has(a.id);
+    const div = document.createElement("div");
+    div.className = "pick" + (added ? " added" : "") + (!added && elsewhere.has(a.id) ? " elsewhere" : "");
+    div.title = a.id + (elsewhere.has(a.id) ? `  (也在 ${elsewhere.get(a.id)})` : "") + (a.in_available ? "  · 已在 available" : "");
+    div.innerHTML = `<img loading="lazy" src="${thumbURL(a.id)}" /><div class="cap">${escapeHtml(shortId(a.id))}</div>`;
+    if (!added) div.addEventListener("click", () => {
+      cat.ids.push(a.id); setDirty(true); renderDrawer(); renderCats(); renderStats();
+    });
+    grid.appendChild(div);
+  }
+  if (!shown) grid.innerHTML = `<div class="empty">没有匹配的资产</div>`;
+}
+
+// ---------- new category ----------
+function newCategory(){
+  let name = prompt("新类目名（英文/下划线，如 tea_cup）:");
+  if (!name) return; name = name.trim(); if (!name) return;
+  if (STATE.categories.some(c=>c.name===name)){ alert("已存在同名类目"); return; }
+  STATE.categories.unshift({ name, description:"", ids:[] });
+  setDirty(true); renderCats(); renderStats();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+// ---------- save / load ----------
+async function save(){
+  // guard duplicate names
+  const names = STATE.categories.map(c=>c.name);
+  const dup = names.find((n,i)=>names.indexOf(n)!==i);
+  if (dup){ alert("有重复类目名: " + dup); return; }
+  if (names.some(n=>!n)){ alert("有空类目名"); return; }
+  const payload = { version: STATE.version, note: STATE.note, candidate_categories: {} };
+  STATE.categories.forEach(c => {
+    payload.candidate_categories[c.name] = { description: c.description||"", recommended_asset_ids: c.ids };
+  });
+  const btn = $("#save"); btn.disabled = true; btn.textContent = "保存中…";
+  try {
+    const res = await fetch("/categories", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+    if (!res.ok){ const t = await res.text(); throw new Error(t); }
+    const j = await res.json();
+    setDirty(false);
+    btn.textContent = `已保存 ✓ (${j.category_count} 类)`;
+    setTimeout(()=>{ btn.textContent = "保存 (⌘/Ctrl+S)"; }, 1600);
+  } catch(e){
+    alert("保存失败:\n" + e.message); btn.textContent = "保存 (⌘/Ctrl+S)";
+  } finally { btn.disabled = false; }
+}
+
+async function boot(){
+  META = await (await fetch("/meta")).json();
+  $("#filePath").textContent = META.path;
+  const fs = $("#fSource"); META.sources.forEach(s=>{ const o=document.createElement("option"); o.value=o.textContent=s; fs.appendChild(o); });
+  const ft = $("#fTag"); META.tags.forEach(t=>{ const o=document.createElement("option"); o.value=o.textContent=t; ft.appendChild(o); });
+  const data = await (await fetch("/categories")).json();
+  STATE.version = data.version || 1; STATE.note = data.note || "";
+  STATE.categories = Object.entries(data.candidate_categories || {}).map(([name, c]) => ({
+    name, description: c.description || "", ids: [...(c.recommended_asset_ids || [])]
+  }));
+  // preload sizes for captions
+  await ensureAssets();
+  renderCats(); renderStats(); setDirty(false);
+}
+
+// events
+$("#save").addEventListener("click", save);
+$("#newCat").addEventListener("click", newCategory);
+$("#catFilter").addEventListener("input", renderCats);
+$("#drawerClose").addEventListener("click", closeDrawer);
+$("#overlay").addEventListener("click", closeDrawer);
+["#q","#fSource","#fTag","#onlyUnassigned","#onlyNotInAvail"].forEach(s=>{
+  $(s).addEventListener("input", renderDrawer); $(s).addEventListener("change", renderDrawer);
+});
+document.addEventListener("keydown", e => {
+  if ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="s"){ e.preventDefault(); save(); }
+  if (e.key==="Escape") closeDrawer();
+});
+window.addEventListener("beforeunload", e => { if (dirty){ e.preventDefault(); e.returnValue=""; } });
+
+boot();
+</script>
+</body>
+</html>
