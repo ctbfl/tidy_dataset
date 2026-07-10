@@ -121,6 +121,28 @@
           </div>
           <button class="fix-toggle" id="fixToggleBtn" type="button" aria-expanded="false" aria-controls="fixPanel">Fix</button>
         </div>
+        <div class="size-widget" id="sizeWidget">
+          <button class="size-toggle" id="sizeToggleBtn" type="button" aria-expanded="false" aria-controls="sizePanel">Size</button>
+          <div class="size-panel" id="sizePanel">
+            <div class="size-current" id="sizeCurrent">scale —</div>
+            <div class="size-dims" id="sizeDims"></div>
+            <div class="size-row">
+              <button type="button" data-scale-factor="0.5" title="Shrink to 50%">&times;0.5</button>
+              <button type="button" data-scale-factor="0.8" title="Shrink to 80%">&times;0.8</button>
+              <button type="button" data-scale-factor="0.9" title="Shrink to 90%">&times;0.9</button>
+            </div>
+            <div class="size-row">
+              <button type="button" data-scale-factor="1.1" title="Grow to 110%">&times;1.1</button>
+              <button type="button" data-scale-factor="1.25" title="Grow to 125%">&times;1.25</button>
+              <button type="button" data-scale-factor="2" title="Grow to 200%">&times;2</button>
+            </div>
+            <div class="size-custom">
+              <input type="number" id="sizeUniformInput" step="0.001" min="0" inputmode="decimal" placeholder="uniform scale">
+              <button class="primary size-set" id="sizeSetBtn" type="button">Set</button>
+            </div>
+            <div class="size-status" id="sizeStatus"></div>
+          </div>
+        </div>
         <div class="viewer-hint" id="viewerHint">Loading viewer...</div>
       </div>
     </div>
@@ -161,6 +183,13 @@
     const fixToggleBtn = document.getElementById("fixToggleBtn");
     const fixSaveBtn = document.getElementById("fixSaveBtn");
     const fixStatus = document.getElementById("fixStatus");
+    const sizeWidget = document.getElementById("sizeWidget");
+    const sizeToggleBtn = document.getElementById("sizeToggleBtn");
+    const sizeSetBtn = document.getElementById("sizeSetBtn");
+    const sizeStatus = document.getElementById("sizeStatus");
+    const sizeCurrent = document.getElementById("sizeCurrent");
+    const sizeDims = document.getElementById("sizeDims");
+    const sizeUniformInput = document.getElementById("sizeUniformInput");
     const FALLBACK_AVAILABLE_TAGS = ["Kitchen", "Tools", "Desk", "bowl", "cup", "plate"];
     const SCENE_TAGS = ["Kitchen", "Tools", "Desk"];
     const SCENE_TAG_KEYS = new Set(SCENE_TAGS.map((tag) => tag.toLowerCase()));
@@ -184,6 +213,7 @@
       enabledQueued: null,
       loaded: false,
       saving: false,
+      scaling: false,
       frame: null,
       token: 0,
       resizeObserver: null,
@@ -513,6 +543,96 @@
     function setFixStatus(text, isError = false) {
       fixStatus.textContent = text || "";
       fixStatus.classList.toggle("error", Boolean(isError));
+    }
+
+    function setSizeStatus(text, isError = false) {
+      sizeStatus.textContent = text || "";
+      sizeStatus.classList.toggle("error", Boolean(isError));
+    }
+
+    function normalizeScale(scale) {
+      const s = Array.isArray(scale) ? scale : [scale, scale, scale];
+      return [Number(s[0]) || 1, Number(s[1]) || Number(s[0]) || 1, Number(s[2]) || Number(s[0]) || 1];
+    }
+
+    function formatScale(scale) {
+      const s = normalizeScale(scale);
+      const uniform = Math.abs(s[0] - s[1]) < 1e-9 && Math.abs(s[1] - s[2]) < 1e-9;
+      if (uniform) return String(Number(s[0].toPrecision(6)));
+      return s.map((v) => String(Number(v.toPrecision(6)))).join(" · ");
+    }
+
+    function formatDims(aabb) {
+      if (!aabb || !Array.isArray(aabb.size)) return "";
+      const cm = aabb.size.map((v) => Number(v) * 100);
+      return `${cm[0].toFixed(1)} × ${cm[1].toFixed(1)} × ${cm[2].toFixed(1)} cm`;
+    }
+
+    function renderSizePanel(item) {
+      const scale = normalizeScale((item && item.scale) || [1, 1, 1]);
+      sizeCurrent.textContent = `scale ${formatScale(scale)}`;
+      const dims = formatDims(item && item.aabb_m);
+      sizeDims.textContent = dims ? `size ${dims}` : "";
+      sizeUniformInput.value = String(Number(scale[0].toPrecision(6)));
+    }
+
+    function updatePayloadScale(item, scale, aabb) {
+      if (!item) return;
+      item.scale = normalizeScale(scale);
+      item.aabb_m = aabb || item.aabb_m;
+      if (item.viewer && item.file_format !== "urdf") {
+        for (const key of ["visual", "collision"]) {
+          if (item.viewer[key]) item.viewer[key].scale = item.scale.slice();
+        }
+      }
+    }
+
+    async function reloadViewerModel() {
+      const item = viewer.currentItem;
+      if (!item) return;
+      viewer.baseStableRotation = cloneRotation((item.viewer && item.viewer.stable_rotation) || [[1, 0, 0], [0, 1, 0], [0, 0, 1]]);
+      viewer.currentStableRotation = cloneRotation(viewer.baseStableRotation);
+      viewer.axesBasis = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+      setFixStatus("");
+      clearObjects();
+      const token = viewer.token + 1;
+      viewer.token = token;
+      renderLayerControls();
+      setViewerHint("Reloading...");
+      try {
+        await loadViewerLayers(item, token);
+      } catch (error) {
+        setViewerHint(`3D reload failed: ${error.message}`);
+      }
+    }
+
+    async function applyScale(body) {
+      if (!viewer.currentItem || viewer.scaling) return;
+      viewer.scaling = true;
+      sizeSetBtn.disabled = true;
+      setSizeStatus("saving");
+      try {
+        const response = await fetch("/api/assets/scale", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ asset_id: viewer.currentItem.asset_id, ...body }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || response.statusText);
+        }
+        const payload = await response.json();
+        updatePayloadScale(viewer.currentItem, payload.scale, payload.aabb_m);
+        renderSizePanel(viewer.currentItem);
+        const dims = formatDims(payload.aabb_m);
+        setSizeStatus(dims ? `saved · ${dims}` : "saved");
+        await reloadViewerModel();
+      } catch (error) {
+        setSizeStatus(error.message, true);
+      } finally {
+        viewer.scaling = false;
+        sizeSetBtn.disabled = false;
+      }
     }
 
     function tagKey(tag) {
@@ -863,6 +983,9 @@
       setEnabledStatus("");
       renderEnabledToggle(item);
       renderTagPanel(item);
+      renderSizePanel(item);
+      setSizeStatus("");
+      sizeWidget.style.display = "";
       viewer.baseStableRotation = cloneRotation((item.viewer && item.viewer.stable_rotation) || [[1, 0, 0], [0, 1, 0], [0, 0, 1]]);
       viewer.currentStableRotation = cloneRotation(viewer.baseStableRotation);
       viewer.axesBasis = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
@@ -892,6 +1015,9 @@
       renderEnabledToggle(null);
       tagWidget.classList.remove("open");
       tagToggleBtn.setAttribute("aria-expanded", "false");
+      sizeWidget.classList.remove("open");
+      sizeToggleBtn.setAttribute("aria-expanded", "false");
+      setSizeStatus("");
       viewer.tagOriginal = [];
       viewer.tagSelected = new Set();
       tagList.innerHTML = "";
@@ -915,6 +1041,31 @@
       const open = !fixWidget.classList.contains("open");
       fixWidget.classList.toggle("open", open);
       fixToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    sizeToggleBtn.addEventListener("click", () => {
+      const open = !sizeWidget.classList.contains("open");
+      sizeWidget.classList.toggle("open", open);
+      sizeToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    document.querySelectorAll("[data-scale-factor]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const factor = Number(button.dataset.scaleFactor);
+        if (Number.isFinite(factor) && factor > 0) applyScale({ factor });
+      });
+    });
+    sizeSetBtn.addEventListener("click", () => {
+      const value = Number(sizeUniformInput.value);
+      if (!Number.isFinite(value) || value <= 0) {
+        setSizeStatus("enter a positive scale", true);
+        return;
+      }
+      applyScale({ scale: value });
+    });
+    sizeUniformInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        sizeSetBtn.click();
+      }
     });
     tagToggleBtn.addEventListener("click", () => {
       const open = !tagWidget.classList.contains("open");

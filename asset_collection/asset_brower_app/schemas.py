@@ -89,15 +89,18 @@ class AssetGeometry:
     pybullet_collision_mesh: dict[str, str] | str = ""
     scale: list[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
     stable_rotation: list[list[float]] = field(default_factory=lambda: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    aabb_m: dict[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "AssetGeometry":
+        aabb = data.get("aabb_m")
         return cls(
             visual_mesh=_path_ref(data.get("visual_mesh")),
             collision_mesh=_path_ref(data.get("collision_mesh")),
             pybullet_collision_mesh=_path_ref(data.get("pybullet_collision_mesh")),
             scale=_float3(data.get("scale"), (1.0, 1.0, 1.0)),
             stable_rotation=_matrix3(data.get("stable_rotation")),
+            aabb_m=dict(aabb) if isinstance(aabb, Mapping) else None,
         )
 
 

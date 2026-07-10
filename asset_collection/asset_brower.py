@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "asset_library",
         nargs="?",
-        default="../handcraft_bundle/asset_library",
+        default="/home/hjs/Projects/table_arrangement/organize_it_v2/data/asset_library",
         help="Asset library directory, default ../handcraft_bundle/asset_library",
     )
     parser.add_argument("--host", default="127.0.0.1", help="HTTP host, default 127.0.0.1")

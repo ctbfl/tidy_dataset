@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import mimetypes
 import os
 from http import HTTPStatus
@@ -35,6 +36,34 @@ from .deps import compute_stable_aabb_m
 from .pages import STATIC_DIR, page_text
 
 ASSETS_PAGE = page_text("assets.html")
+
+SCALE_MIN = 1e-6
+SCALE_MAX = 1e6
+
+
+def _normalize_scale(value: Any) -> list[float]:
+    if value is None:
+        return [1.0, 1.0, 1.0]
+    if isinstance(value, (int, float)):
+        v = float(value)
+        return [v, v, v]
+    seq = list(value)
+    if len(seq) == 1:
+        v = float(seq[0])
+        return [v, v, v]
+    if len(seq) >= 3:
+        return [float(seq[0]), float(seq[1]), float(seq[2])]
+    raise ValueError("scale must be a number or a 3-vector")
+
+
+def _finite_positive(value: Any, name: str) -> float:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be a number")
+    if not math.isfinite(v) or v <= 0.0:
+        raise ValueError(f"{name} must be a positive finite number")
+    return v
 
 
 class AssetBrowserRequestHandler(BaseHTTPRequestHandler):
@@ -104,6 +133,8 @@ class AssetBrowserRequestHandler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/api/assets/stable-rotation":
                 self._handle_asset_stable_rotation_save()
+            elif parsed.path == "/api/assets/scale":
+                self._handle_asset_scale_save()
             elif parsed.path == "/api/assets/enabled":
                 self._handle_asset_enabled_save()
             elif parsed.path == "/api/assets/tags":
@@ -253,6 +284,58 @@ class AssetBrowserRequestHandler(BaseHTTPRequestHandler):
                 "asset_id": asset_id,
                 "asset_json": str(asset_json_path),
                 "stable_rotation": stable_rotation,
+                "aabb_m": geometry["aabb_m"],
+            }
+        )
+
+    def _handle_asset_scale_save(self) -> None:
+        payload = self._read_json_body(max_bytes=16_000)
+        asset_id = str(payload.get("asset_id") or "").strip()
+        if not asset_id:
+            raise ValueError("asset_id is required")
+        has_factor = payload.get("factor") is not None
+        has_scale = payload.get("scale") is not None
+        if has_factor == has_scale:
+            raise ValueError("provide exactly one of factor or scale")
+
+        with _ASSET_LOCK:
+            asset_json_path = _asset_json_path_for_id(asset_id)
+            record = json.loads(asset_json_path.read_text(encoding="utf-8"))
+            if not isinstance(record, dict):
+                raise ValueError(f"Asset JSON must be an object: {asset_json_path}")
+            if record.get("asset_id") != asset_id:
+                raise ValueError(f"Asset JSON id mismatch: {asset_json_path}")
+            geometry = record.setdefault("geometry", {})
+            if not isinstance(geometry, dict):
+                raise ValueError(f"Asset geometry must be an object: {asset_json_path}")
+
+            current = _normalize_scale(geometry.get("scale"))
+            if has_factor:
+                factor = _finite_positive(payload.get("factor"), "factor")
+                new_scale = [component * factor for component in current]
+            else:
+                uniform = _finite_positive(payload.get("scale"), "scale")
+                new_scale = [uniform, uniform, uniform]
+            new_scale = [round(float(v), 12) for v in new_scale]
+            if any(not (SCALE_MIN <= v <= SCALE_MAX) for v in new_scale):
+                raise ValueError(f"resulting scale is out of range ({SCALE_MIN:g} .. {SCALE_MAX:g})")
+
+            geometry["scale"] = new_scale
+            geometry.setdefault("stable_rotation", [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+            catalog = _catalog_data()
+            geometry["aabb_m"] = compute_stable_aabb_m(
+                record,
+                asset_dir=asset_json_path.parent,
+                library_root=ASSET_LIBRARY_ROOT,
+                source_roots=_catalog_source_roots(catalog),
+            )
+            asset_json_path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+        self._send_json(
+            {
+                "asset_id": asset_id,
+                "asset_json": str(asset_json_path),
+                "scale": new_scale,
                 "aabb_m": geometry["aabb_m"],
             }
         )

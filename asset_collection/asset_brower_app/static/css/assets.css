@@ -887,6 +887,106 @@
       color: #b42318;
     }
 
+    .size-widget {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      z-index: 3;
+      display: grid;
+      justify-items: end;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .size-toggle {
+      min-width: 48px;
+      height: 32px;
+      padding: 0 10px;
+      border-color: rgba(152, 162, 179, 0.65);
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 6px 18px rgba(16, 24, 40, 0.14);
+    }
+
+    .size-panel {
+      display: none;
+      width: 200px;
+      padding: 10px;
+      border: 1px solid rgba(152, 162, 179, 0.48);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 8px 24px rgba(16, 24, 40, 0.16);
+    }
+
+    .size-widget.open .size-panel {
+      display: grid;
+      gap: 8px;
+    }
+
+    .size-current {
+      color: #101828;
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .size-dims {
+      min-height: 14px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .size-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .size-row button {
+      min-width: 0;
+      height: 30px;
+      padding: 0;
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .size-custom {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .size-custom input {
+      width: 100%;
+      min-width: 0;
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid rgba(152, 162, 179, 0.6);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .size-set {
+      min-width: 0;
+      height: 32px;
+      padding: 0 12px;
+    }
+
+    .size-status {
+      min-height: 14px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+
+    .size-status.error {
+      color: #b42318;
+    }
+
     @media (max-width: 1220px) {
       .asset-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
