@@ -1,0 +1,202 @@
+[
+  {
+    "model":"gemini_3.1_pro",
+    "perspective":"tidy",
+    "pure win":36,
+    "pure lose":25,
+    "tie":9,
+    "inconsistent":3,
+    "weak win":11,
+    "weak lose":6
+  },
+  {
+    "model":"gemini_3.1_pro",
+    "perspective":"user_intent",
+    "pure win":40,
+    "pure lose":27,
+    "tie":1,
+    "inconsistent":17,
+    "weak win":1,
+    "weak lose":4
+  },
+  {
+    "model":"gemma_4_12B_it",
+    "perspective":"tidy",
+    "pure win":28,
+    "pure lose":27,
+    "tie":1,
+    "inconsistent":24,
+    "weak win":5,
+    "weak lose":5
+  },
+  {
+    "model":"gemma_4_12B_it",
+    "perspective":"user_intent",
+    "pure win":36,
+    "pure lose":18,
+    "tie":3,
+    "inconsistent":25,
+    "weak win":4,
+    "weak lose":4
+  },
+  {
+    "model":"gemma_4_26B_A4B",
+    "perspective":"tidy",
+    "pure win":20,
+    "pure lose":27,
+    "tie":13,
+    "inconsistent":16,
+    "weak win":5,
+    "weak lose":9
+  },
+  {
+    "model":"gemma_4_26B_A4B",
+    "perspective":"user_intent",
+    "pure win":25,
+    "pure lose":28,
+    "tie":7,
+    "inconsistent":24,
+    "weak win":2,
+    "weak lose":4
+  },
+  {
+    "model":"glm_4.6v_flash",
+    "perspective":"tidy",
+    "pure win":14,
+    "pure lose":35,
+    "tie":5,
+    "inconsistent":19,
+    "weak win":12,
+    "weak lose":5
+  },
+  {
+    "model":"glm_4.6v_flash",
+    "perspective":"user_intent",
+    "pure win":17,
+    "pure lose":35,
+    "tie":4,
+    "inconsistent":19,
+    "weak win":10,
+    "weak lose":5
+  },
+  {
+    "model":"gpt_5.5",
+    "perspective":"tidy",
+    "pure win":46,
+    "pure lose":27,
+    "tie":0,
+    "inconsistent":15,
+    "weak win":1,
+    "weak lose":1
+  },
+  {
+    "model":"gpt_5.5",
+    "perspective":"user_intent",
+    "pure win":50,
+    "pure lose":11,
+    "tie":0,
+    "inconsistent":26,
+    "weak win":2,
+    "weak lose":1
+  },
+  {
+    "model":"kimi_k2.6",
+    "perspective":"tidy",
+    "pure win":44,
+    "pure lose":29,
+    "tie":0,
+    "inconsistent":15,
+    "weak win":0,
+    "weak lose":2
+  },
+  {
+    "model":"kimi_k2.6",
+    "perspective":"user_intent",
+    "pure win":46,
+    "pure lose":27,
+    "tie":0,
+    "inconsistent":14,
+    "weak win":0,
+    "weak lose":3
+  },
+  {
+    "model":"opus_4.8",
+    "perspective":"tidy",
+    "pure win":41,
+    "pure lose":26,
+    "tie":5,
+    "inconsistent":16,
+    "weak win":2,
+    "weak lose":0
+  },
+  {
+    "model":"opus_4.8",
+    "perspective":"user_intent",
+    "pure win":34,
+    "pure lose":22,
+    "tie":11,
+    "inconsistent":12,
+    "weak win":8,
+    "weak lose":3
+  },
+  {
+    "model":"qwen3.6_27B",
+    "perspective":"tidy",
+    "pure win":28,
+    "pure lose":19,
+    "tie":1,
+    "inconsistent":42,
+    "weak win":0,
+    "weak lose":0
+  },
+  {
+    "model":"qwen3.6_27B",
+    "perspective":"user_intent",
+    "pure win":28,
+    "pure lose":15,
+    "tie":0,
+    "inconsistent":47,
+    "weak win":0,
+    "weak lose":0
+  },
+  {
+    "model":"qwen3_vl_8B",
+    "perspective":"tidy",
+    "pure win":3,
+    "pure lose":28,
+    "tie":4,
+    "inconsistent":42,
+    "weak win":5,
+    "weak lose":8
+  },
+  {
+    "model":"qwen3_vl_8B",
+    "perspective":"user_intent",
+    "pure win":4,
+    "pure lose":28,
+    "tie":4,
+    "inconsistent":41,
+    "weak win":5,
+    "weak lose":8
+  },
+  {
+    "model":"sonnet_5",
+    "perspective":"tidy",
+    "pure win":29,
+    "pure lose":30,
+    "tie":12,
+    "inconsistent":6,
+    "weak win":11,
+    "weak lose":2
+  },
+  {
+    "model":"sonnet_5",
+    "perspective":"user_intent",
+    "pure win":28,
+    "pure lose":16,
+    "tie":20,
+    "inconsistent":8,
+    "weak win":8,
+    "weak lose":10
+  }
+]

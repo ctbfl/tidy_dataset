@@ -1,0 +1,21 @@
+model,perspective,pure win,pure lose,tie,inconsistent,weak win,weak lose
+gemini_3.1_pro,tidy,36,25,9,3,11,6
+gemini_3.1_pro,user_intent,40,27,1,17,1,4
+gemma_4_12B_it,tidy,28,27,1,24,5,5
+gemma_4_12B_it,user_intent,36,18,3,25,4,4
+gemma_4_26B_A4B,tidy,20,27,13,16,5,9
+gemma_4_26B_A4B,user_intent,25,28,7,24,2,4
+glm_4.6v_flash,tidy,14,35,5,19,12,5
+glm_4.6v_flash,user_intent,17,35,4,19,10,5
+gpt_5.5,tidy,46,27,0,15,1,1
+gpt_5.5,user_intent,50,11,0,26,2,1
+kimi_k2.6,tidy,44,29,0,15,0,2
+kimi_k2.6,user_intent,46,27,0,14,0,3
+opus_4.8,tidy,41,26,5,16,2,0
+opus_4.8,user_intent,34,22,11,12,8,3
+qwen3.6_27B,tidy,28,19,1,42,0,0
+qwen3.6_27B,user_intent,28,15,0,47,0,0
+qwen3_vl_8B,tidy,3,28,4,42,5,8
+qwen3_vl_8B,user_intent,4,28,4,41,5,8
+sonnet_5,tidy,29,30,12,6,11,2
+sonnet_5,user_intent,28,16,20,8,8,10
